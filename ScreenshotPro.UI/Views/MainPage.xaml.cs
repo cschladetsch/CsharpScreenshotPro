@@ -1,18 +1,31 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+
 namespace ScreenshotPro.UI.Views
 {
     /// <summary>
-    /// A simple page that can be used on its own or navigated to within a Frame.
+    /// Main page with navigation to different views
     /// </summary>
     public partial class MainPage : Page
     {
-        int count = 0;
-
         public MainPage()
         {
             this.InitializeComponent();
         }
 
-        private void OnCountClicked(object sender, RoutedEventArgs e)
-            => txtCount.Text = $"Current count: {count++}";
+        private void LibraryButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(LibraryPage));
+        }
+
+        private void EditorButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(EditorPage));
+        }
+
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(SettingsPage));
+        }
     }
 }
