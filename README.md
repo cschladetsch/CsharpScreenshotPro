@@ -151,9 +151,81 @@ choco install dotnet-8.0-sdk
 dotnet --version  # Should show 8.0.x
 ```
 
-### Quick Start with Run Script
+## Build and Run Scripts
 
-The easiest way to build and run ScreenshotPro is using the included run script:
+ScreenshotPro includes convenient PowerShell scripts for building and running the application:
+
+### build.ps1 - Build Script
+
+The PowerShell build script provides flexible build options with colorized output:
+
+```powershell
+# Quick build (fastest for development)
+.\build.ps1
+
+# Clean build (removes all build artifacts first)
+.\build.ps1 -Clean
+
+# Build and run immediately
+.\build.ps1 -Run
+
+# Clean, build, and run (full workflow)
+.\build.ps1 -Clean -Run
+
+# Show help
+.\build.ps1 -Help
+```
+
+**Features:**
+- 🚀 **Smart Building**: Incremental builds by default for speed
+- 🧹 **Clean Option**: Full rebuild when needed with `-Clean`
+- 🏃 **Auto-Run**: Automatically launch app after successful build with `-Run`
+- 🌈 **Rich Output**: Colorized status messages with emojis for better feedback
+- ❌ **Error Handling**: Clear error messages and proper exit codes
+
+### run.ps1 - Run Script
+
+The PowerShell run script provides flexible execution options:
+
+```powershell
+# Run UI project (default)
+.\run.ps1
+
+# Run in Release configuration
+.\run.ps1 -Configuration Release
+
+# Run tests instead of UI
+.\run.ps1 -Project ScreenshotPro.Tests
+
+# Show help
+.\run.ps1 -Help
+```
+
+**Features:**
+- 🎯 **Project Selection**: Choose which project to run
+- ⚙️ **Configuration Control**: Switch between Debug/Release builds
+- 📋 **Smart Detection**: Automatically finds and validates projects
+- 🔍 **Launch Settings**: Uses project-specific launch configurations
+- 🌈 **Professional Output**: Clear status messages with color coding
+
+### Legacy Batch Files
+
+For compatibility, batch file equivalents are also available:
+- `build.bat` - Basic build functionality
+- `run.bat` - Basic run functionality
+
+*Note: PowerShell scripts are recommended for the best experience.*
+
+### Quick Start Workflow
+
+```powershell
+# Clone and setup
+git clone https://github.com/cschladetsch/ScreenshotPro.git
+cd ScreenshotPro
+
+# One-command build and run
+.\build.ps1 -Run
+```
 
 ### Manual Build Process
 
