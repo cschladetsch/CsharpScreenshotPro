@@ -1,31 +1,48 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace ScreenshotPro.UI.Views
 {
-    /// <summary>
-    /// Main page with navigation to different views
-    /// </summary>
-    public partial class MainPage : Page
+    public sealed partial class MainPage : Page
     {
+        private readonly Dictionary<string, Type> _routes = new()
+        {
+            ["library"] = typeof(LibraryPage),
+            ["editor"] = typeof(EditorPage),
+            ["settings"] = typeof(SettingsPage)
+        };
+
         public MainPage()
         {
-            this.InitializeComponent();
+            InitializeComponent();
         }
 
-        private void LibraryButton_Click(object sender, RoutedEventArgs e)
+        private void RootNav_Loaded(object sender, RoutedEventArgs e)
         {
-            Frame.Navigate(typeof(LibraryPage));
+            if (RootNav.MenuItems.Count > 0)
+            {
+                RootNav.SelectedItem = RootNav.MenuItems[0];
+            }
+
+            NavigateTo("library");
         }
 
-        private void EditorButton_Click(object sender, RoutedEventArgs e)
+        private void RootNav_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
         {
-            Frame.Navigate(typeof(EditorPage));
+            if (args.InvokedItemContainer is NavigationViewItem item && item.Tag is string tag)
+            {
+                NavigateTo(tag);
+            }
         }
 
-        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        private void NavigateTo(string tag)
         {
-            Frame.Navigate(typeof(SettingsPage));
+            if (_routes.TryGetValue(tag, out var pageType))
+            {
+                ContentFrame.Navigate(pageType);
+            }
         }
     }
 }

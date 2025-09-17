@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="ScreenshotPro.UI.Views.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -8,29 +8,18 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
-        <TextBlock Text="ScreenshotPro" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center"/>
-        <TextBlock Text="Professional Screenshot Annotation Tool" FontSize="16" HorizontalAlignment="Center"/>
+    <NavigationView x:Name="RootNav"
+                    IsBackEnabled="False"
+                    IsSettingsVisible="False"
+                    PaneDisplayMode="Left"
+                    ItemInvoked="RootNav_ItemInvoked"
+                    Loaded="RootNav_Loaded">
+        <NavigationView.MenuItems>
+            <NavigationViewItem Content="Library" Icon="Library" Tag="library"/>
+            <NavigationViewItem Content="Editor" Icon="Edit" Tag="editor"/>
+            <NavigationViewItem Content="Settings" Icon="Setting" Tag="settings"/>
+        </NavigationView.MenuItems>
 
-        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" Margin="0,20,0,0">
-            <Button x:Name="LibraryButton" Content="📷 Library" Click="LibraryButton_Click" Width="120" Height="40"/>
-            <Button x:Name="EditorButton" Content="✏️ Editor" Click="EditorButton_Click" Width="120" Height="40"/>
-            <Button x:Name="SettingsButton" Content="⚙️ Settings" Click="SettingsButton_Click" Width="120" Height="40"/>
-        </StackPanel>
-
-        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                CornerRadius="8"
-                Padding="20"
-                Margin="0,20,0,0"
-                Width="600">
-            <StackPanel Spacing="10">
-                <TextBlock Text="Features:" FontWeight="SemiBold"/>
-                <TextBlock Text="• Multi-mode screenshot capture"/>
-                <TextBlock Text="• Advanced annotation tools (arrows, text, shapes)"/>
-                <TextBlock Text="• Professional export options"/>
-                <TextBlock Text="• Layer-based editing system"/>
-                <TextBlock Text="• Windows 11 native design"/>
-            </StackPanel>
-        </Border>
-    </StackPanel>
+        <Frame x:Name="ContentFrame" />
+    </NavigationView>
 </Page>

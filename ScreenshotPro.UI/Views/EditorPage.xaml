@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ScreenshotPro.UI.Views.EditorPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Screenshot_2025-09-16_23-35-10.png"
+                   FontSize="22"
+                   FontWeight="SemiBold"/>
+
+        <CommandBar Grid.Row="1"
+                    Margin="0,16,0,16">
+            <AppBarButton Icon="Copy" Label="Copy"/>
+            <AppBarButton Icon="Save" Label="Save"/>
+            <AppBarButton Icon="Share" Label="Export"/>
+            <CommandBar.Content>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock VerticalAlignment="Center" Text="Zoom"/>
+                    <Slider Width="140" Minimum="25" Maximum="200" Value="100"/>
+                    <TextBlock VerticalAlignment="Center" Text="100%"/>
+                </StackPanel>
+            </CommandBar.Content>
+        </CommandBar>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="320"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Spacing="12">
+                <TextBlock Text="Tools" FontSize="18" FontWeight="SemiBold"/>
+                <StackPanel Spacing="8">
+                    <Button Content="Arrow" Height="44" CornerRadius="8"/>
+                    <Button Content="Rectangle" Height="44" CornerRadius="8"/>
+                    <Button Content="Text" Height="44" CornerRadius="8"/>
+                    <Button Content="Marker" Height="44" CornerRadius="8"/>
+                    <Button Content="Blur" Height="44" CornerRadius="8"/>
+                    <Button Content="Number" Height="44" CornerRadius="8"/>
+                </StackPanel>
+            </StackPanel>
+
+            <Border Grid.Column="1"
+                    Margin="24,0"
+                    Background="White"
+                    CornerRadius="14"
+                    Padding="32">
+                <Grid>
+                    <Border Background="#FFF5F6F8" CornerRadius="12" Padding="24" HorizontalAlignment="Center" Width="420">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Welcome to Example.com"
+                                       FontSize="26"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Lorem ipsum dolor sit amet, consectetur"
+                                       Foreground="Gray"/>
+                            <TextBox PlaceholderText="email@example.com"/>
+                            <Button Content="Sign Up"
+                                    HorizontalAlignment="Left"
+                                    Background="#FF2B6CB0"
+                                    Foreground="White"
+                                    Padding="20,8"
+                                    CornerRadius="10"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Canvas>
+                        <Line X1="120" Y1="220" X2="260" Y2="180" Stroke="#FF2B6CB0" StrokeThickness="6" StrokeEndLineCap="Round" StrokeStartLineCap="Round"/>
+                        <Polygon Points="260,180 300,190 262,210" Fill="#FF2B6CB0"/>
+                    </Canvas>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Column="2" HorizontalScrollMode="Disabled">
+                <StackPanel Spacing="24">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Arrow Properties" FontSize="20" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock VerticalAlignment="Center" Text="Color" FontWeight="SemiBold"/>
+                            <Border Width="36" Height="36" Background="#FFDC3F45" CornerRadius="6"/>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Thickness"/>
+                            <Slider Minimum="1" Maximum="10" Value="5"/>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Arrowhead"/>
+                            <ComboBox SelectedIndex="0">
+                                <ComboBoxItem>Filled Triangle</ComboBoxItem>
+                                <ComboBoxItem>Open Arrow</ComboBoxItem>
+                                <ComboBoxItem>Circle Cap</ComboBoxItem>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Opacity"/>
+                            <Slider Minimum="0" Maximum="100" Value="100"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Layers" FontSize="20" FontWeight="SemiBold"/>
+                        <ListView SelectionMode="Single">
+                            <ListViewItem Content="Arrow 1" IsSelected="True"/>
+                            <ListViewItem Content="Blur 1"/>
+                            <ListViewItem Content="Screenshot Background"/>
+                        </ListView>
+                    </StackPanel>
+
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Quick Actions" FontSize="20" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Content="Duplicate"/>
+                            <Button Content="Delete"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page>
