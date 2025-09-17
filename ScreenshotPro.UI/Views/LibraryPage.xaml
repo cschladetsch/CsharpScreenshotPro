@@ -21,7 +21,8 @@
                     Padding="18,10"
                     Background="#FF2B6CB0"
                     Foreground="White"
-                    CornerRadius="8"/>
+                    CornerRadius="8"
+                    Click="NewCaptureButton_Click"/>
             <ComboBox Width="160" SelectedIndex="0">
                 <ComboBoxItem>All Screenshots</ComboBoxItem>
                 <ComboBoxItem>Last 7 Days</ComboBoxItem>

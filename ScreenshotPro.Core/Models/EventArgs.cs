@@ -63,3 +63,24 @@ public class SettingsChangedEventArgs : EventArgs
         NewValue = newValue;
     }
 }
+
+public class RegionSelectedEventArgs : EventArgs
+{
+    public Region? SelectedRegion { get; set; }
+    public bool WasCancelled { get; set; }
+
+    public RegionSelectedEventArgs()
+    {
+    }
+
+    public RegionSelectedEventArgs(Region selectedRegion)
+    {
+        SelectedRegion = selectedRegion;
+        WasCancelled = false;
+    }
+
+    public RegionSelectedEventArgs(bool cancelled)
+    {
+        WasCancelled = cancelled;
+    }
+}

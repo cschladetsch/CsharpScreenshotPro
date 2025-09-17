@@ -31,6 +31,11 @@
                 Padding="32">
             <StackPanel Spacing="20">
                 <TextBlock Text="Capture Settings" FontSize="22" FontWeight="SemiBold"/>
+                <TextBlock Text="Configure how ScreenshotPro captures and handles your screenshots. These settings will apply to all future captures."
+                           FontSize="14"
+                           Foreground="Gray"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,12"/>
                 <StackPanel Orientation="Horizontal" Spacing="20" VerticalAlignment="Center">
                     <TextBlock Text="Default Capture Mode" Width="200" VerticalAlignment="Center"/>
                     <ComboBox Width="200" SelectedIndex="0">
