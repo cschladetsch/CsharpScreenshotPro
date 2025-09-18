@@ -154,6 +154,26 @@ public class WindowsCaptureService : ICaptureService
         });
     }
 
+    public async Task CaptureRegionIntoBitmapAsync(Models.Region region, Bitmap destination)
+    {
+        if (destination == null)
+        {
+            throw new ArgumentNullException(nameof(destination));
+        }
+
+        if (destination.Width != region.Size.Width || destination.Height != region.Size.Height)
+        {
+            throw new ArgumentException("Destination bitmap size must match the capture region.", nameof(destination));
+        }
+
+        await Task.Run(() =>
+        {
+            using var graphics = Graphics.FromImage(destination);
+            graphics.CopyFromScreen(region.Left, region.Top, 0, 0,
+                new System.Drawing.Size(region.Size.Width, region.Size.Height), CopyPixelOperation.SourceCopy);
+        });
+    }
+
     private Bitmap CaptureScreen(int x, int y, int width, int height)
     {
         var bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
@@ -171,3 +191,4 @@ public class WindowsCaptureService : ICaptureService
         CaptureCompleted?.Invoke(this, e);
     }
 }
+

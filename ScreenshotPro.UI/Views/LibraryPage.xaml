@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:ScreenshotPro.UI.Views"
     mc:Ignorable="d">
 
     <Grid Background="#FF1F1F23" Padding="32">
@@ -22,7 +23,8 @@
                     Background="#FF2B6CB0"
                     Foreground="White"
                     CornerRadius="8"
-                    Click="NewCaptureButton_Click"/>
+                    Click="NewCaptureButton_Click"
+                    PointerEntered="NewCaptureButton_PointerEntered"/>
             <ComboBox Width="160" SelectedIndex="0">
                 <ComboBoxItem>All Screenshots</ComboBoxItem>
                 <ComboBoxItem>Last 7 Days</ComboBoxItem>
@@ -49,54 +51,30 @@
 
             <StackPanel Grid.Column="1" Spacing="16">
                 <TextBlock Text="Recent Captures" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
-                <GridView SelectionMode="None">
+                <GridView Name="ScreenshotsGridView"
+                          SelectionMode="None"
+                          ItemsSource="{x:Bind Screenshots, Mode=OneWay}">
                     <GridView.ItemsPanel>
                         <ItemsPanelTemplate>
                             <ItemsWrapGrid Orientation="Horizontal"/>
                         </ItemsPanelTemplate>
                     </GridView.ItemsPanel>
-                    <GridViewItem>
-                        <StackPanel Spacing="6">
-                            <Border Background="#FF2F2F35" CornerRadius="12" Height="120"/>
-                            <TextBlock Text="Screenshot_2025-09-16_14-20-00" Foreground="White"/>
-                            <TextBlock Text="Sep 16, 2025 2:20 PM" Foreground="#FFB0B0B5" FontSize="12"/>
-                        </StackPanel>
-                    </GridViewItem>
-                    <GridViewItem>
-                        <StackPanel Spacing="6">
-                            <Border Background="#FF2F2F35" CornerRadius="12" Height="120"/>
-                            <TextBlock Text="Screenshot_2025-09-16_14-11-32" Foreground="White"/>
-                            <TextBlock Text="Sep 16, 2025 2:11 PM" Foreground="#FFB0B0B5" FontSize="12"/>
-                        </StackPanel>
-                    </GridViewItem>
-                    <GridViewItem>
-                        <StackPanel Spacing="6">
-                            <Border Background="#FF2F2F35" CornerRadius="12" Height="120"/>
-                            <TextBlock Text="Screenshot_2025-09-16_13-58-04" Foreground="White"/>
-                            <TextBlock Text="Sep 16, 2025 1:58 PM" Foreground="#FFB0B0B5" FontSize="12"/>
-                        </StackPanel>
-                    </GridViewItem>
-                    <GridViewItem>
-                        <StackPanel Spacing="6">
-                            <Border Background="#FF2F2F35" CornerRadius="12" Height="120"/>
-                            <TextBlock Text="Screenshot_2025-09-16_13-40-42" Foreground="White"/>
-                            <TextBlock Text="Sep 16, 2025 1:40 PM" Foreground="#FFB0B0B5" FontSize="12"/>
-                        </StackPanel>
-                    </GridViewItem>
-                    <GridViewItem>
-                        <StackPanel Spacing="6">
-                            <Border Background="#FF2F2F35" CornerRadius="12" Height="120"/>
-                            <TextBlock Text="Screenshot_2025-09-16_13-28-15" Foreground="White"/>
-                            <TextBlock Text="Sep 16, 2025 1:28 PM" Foreground="#FFB0B0B5" FontSize="12"/>
-                        </StackPanel>
-                    </GridViewItem>
-                    <GridViewItem>
-                        <StackPanel Spacing="6">
-                            <Border Background="#FF2F2F35" CornerRadius="12" Height="120"/>
-                            <TextBlock Text="Screenshot_2025-09-16_13-12-54" Foreground="White"/>
-                            <TextBlock Text="Sep 16, 2025 1:12 PM" Foreground="#FFB0B0B5" FontSize="12"/>
-                        </StackPanel>
-                    </GridViewItem>
+                    <GridView.ItemTemplate>
+                        <DataTemplate x:DataType="local:ScreenshotItem">
+                            <StackPanel Spacing="6" Width="160">
+                                <Border Background="#FF2F2F35" CornerRadius="12" Height="120">
+                                    <Image Source="{x:Bind ThumbnailPath}"
+                                           Stretch="UniformToFill"/>
+                                </Border>
+                                <TextBlock Text="{x:Bind FileName}"
+                                           Foreground="White"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{x:Bind FormattedDate}"
+                                           Foreground="#FFB0B0B5"
+                                           FontSize="12"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </GridView.ItemTemplate>
                 </GridView>
             </StackPanel>
         </Grid>

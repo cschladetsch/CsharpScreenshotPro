@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="ScreenshotPro.UI.Views.RegionSelectionWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Name="MainGrid" Background="Transparent">
+        <!-- Desktop screenshot background -->
+        <Image Name="DesktopImage" Stretch="Fill"/>
+
+        <!-- Dimming overlay -->
+        <Grid Name="OverlayGrid" Background="#40000000">
+            <!-- Selection canvas -->
+            <Canvas Name="SelectionCanvas">
+                <Rectangle Name="SelectionRectangle"
+                           Stroke="#FF0078D4"
+                           StrokeThickness="2"
+                           Fill="Transparent"
+                           Visibility="Collapsed"/>
+            </Canvas>
+
+            <!-- Instructions text -->
+            <TextBlock Text="Click and drag to select a region. Press ESC to cancel."
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Top"
+                       Margin="0,50,0,0"
+                       Foreground="White"
+                       FontSize="16"
+                       FontWeight="SemiBold"/>
+        </Grid>
+    </Grid>
+</Window>
