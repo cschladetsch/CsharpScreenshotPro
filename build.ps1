@@ -95,6 +95,3 @@ if ($Run) {
         dotnet run --project ScreenshotPro.UI
     }
 }
-else {
-    Read-Host "Press Enter to continue"
-}

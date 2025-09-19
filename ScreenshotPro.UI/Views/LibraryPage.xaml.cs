@@ -17,6 +17,7 @@ namespace ScreenshotPro.UI.Views
         private readonly SnippetStorageService _storageService;
         private readonly string _snippetsFolder;
         private readonly LoggingService _logger;
+        private readonly Bitmap _desktopBitmap;
 
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(int nIndex);
@@ -32,6 +33,12 @@ namespace ScreenshotPro.UI.Views
 
             _logger.LogInfo("LibraryPage constructor started");
 
+            // Pre-allocate desktop bitmap for the entire desktop (including multiple monitors)
+            var screenWidth = GetSystemMetrics(0);
+            var screenHeight = GetSystemMetrics(1);
+            _desktopBitmap = new Bitmap(screenWidth, screenHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            _logger.LogInfo($"Pre-allocated desktop bitmap: {screenWidth}x{screenHeight}");
+
             // Set up Documents/Snippets folder
             var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             _snippetsFolder = Path.Combine(documentsPath, "Snippets");
@@ -45,25 +52,15 @@ namespace ScreenshotPro.UI.Views
             _logger.LogInfo($"LibraryPage initialized. Log file: {_logger.GetLogFilePath()}");
         }
 
+        protected override void OnNavigatedFrom(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+        {
+            base.OnNavigatedFrom(e);
+            _desktopBitmap?.Dispose();
+        }
+
         private void NewCaptureButton_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
-            // Pre-capture desktop when user hovers over button to reduce delay later
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var captureService = new WindowsCaptureService();
-                    var screenWidth = GetSystemMetrics(0);
-                    var screenHeight = GetSystemMetrics(1);
-                    var region = new ScreenshotPro.Core.Models.Region(0, 0, screenWidth, screenHeight);
-                    await captureService.CaptureRegionBitmapAsync(region);
-                    _logger.LogInfo("🔄 Pre-captured desktop on hover");
-                }
-                catch
-                {
-                    // Ignore errors in pre-capture
-                }
-            });
+            // No longer needed since we pre-allocate the desktop bitmap
         }
 
         private async void NewCaptureButton_Click(object sender, RoutedEventArgs e)
@@ -72,9 +69,7 @@ namespace ScreenshotPro.UI.Views
 
             try
             {
-                _logger.LogInfo("🚀 Starting SIMPLE capture...");
-                await StartSimpleCaptureAsync();
-                _logger.LogInfo("✅ Simple capture completed");
+                await StartSnippingModeAsync();
             }
             catch (Exception ex)
             {
@@ -84,65 +79,47 @@ namespace ScreenshotPro.UI.Views
             }
         }
 
-        private async Task StartSequentialAnimationAsync()
+        private async Task StartSnippingModeAsync()
         {
-            _logger.LogInfo("🎬 StartSequentialAnimationAsync called");
+            _logger.LogInfo("🎯 Starting snipping mode with correct sequence");
 
             var mainWindow = App.MainWindow;
             if (mainWindow == null) return;
 
-            // Step 1: Capture desktop FIRST (with main window visible)
-            var captureService = new WindowsCaptureService();
-            var screenWidth = GetSystemMetrics(0);
-            var screenHeight = GetSystemMetrics(1);
-            var region = new ScreenshotPro.Core.Models.Region(0, 0, screenWidth, screenHeight);
+            // Step 1: IMMEDIATELY hide the main window
+            _logger.LogInfo("⚡ IMMEDIATELY hiding main window");
+            mainWindow.Content.Opacity = 0;
+            mainWindow.AppWindow.Hide();
 
-            _logger.LogInfo("🖥️ Capturing desktop with main window visible");
-            var desktopBitmap = await captureService.CaptureRegionBitmapAsync(region);
-            _logger.LogInfo($"📷 Desktop capture result: {(desktopBitmap != null ? "SUCCESS" : "FAILED")}");
-
-            // Step 2: Start fade out AND create RegionSelectionWindow simultaneously
-            _logger.LogInfo("🚀 Starting fade out AND creating RegionSelectionWindow in parallel");
-
-            var fadeOutTask = AnimateFadeOut(mainWindow, 200);
-
-            var createWindowTask = Task.Run(() =>
+            var presenter = mainWindow.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+            if (presenter != null)
             {
-                _logger.LogInfo("🏗️ Creating RegionSelectionWindow during fade out");
-                var regionWindow = new RegionSelectionWindow(desktopBitmap);
-            regionWindow.SuppressOverlayForCapture();
+                presenter.Minimize();
+            }
 
-                // Set up event handlers
-                regionWindow.RegionSelected += async (sender, e) =>
-                {
-                    _logger.LogInfo("🎯 RegionSelected event received");
-                    regionWindow.Close();
-                    await ProcessSelectedRegion(e.SelectedRegion);
-                };
+            // Step 2: Wait for window to be fully hidden
+            _logger.LogInfo("⏳ Ensuring window is fully hidden");
+            await Task.Delay(100); // Give window time to fully hide
 
-                regionWindow.SelectionCancelled += (sender, e) =>
-                {
-                    _logger.LogInfo("❌ SelectionCancelled event received");
-                    regionWindow.Close();
-                    RestoreMainWindow();
-                };
+            // Step 3: Capture clean desktop into pre-allocated bitmap
+            _logger.LogInfo("📸 Capturing clean desktop into pre-allocated bitmap");
+            var screenRegion = new ScreenshotPro.Core.Models.Region(0, 0, _desktopBitmap.Width, _desktopBitmap.Height);
+            await _captureService.CaptureRegionIntoBitmapAsync(screenRegion, _desktopBitmap);
 
-                _logger.LogInfo("✅ RegionSelectionWindow created during fade out");
-                return regionWindow;
-            });
+            // Step 4: Darken the desktop bitmap slightly
+            DarkenBitmap(_desktopBitmap, 0.7f);
+            _logger.LogInfo("🌑 Desktop bitmap darkened");
 
-            // Wait for fade out to complete
-            await fadeOutTask;
-            _logger.LogInfo("✅ Main window fade out COMPLETED");
+            // Step 5: Enter selection mode with darkened desktop
+            _logger.LogInfo("🎯 Entering selection mode");
+            await ShowRegionSelectionOverlay(_desktopBitmap);
+        }
 
-            // Get the created window
-            var regionWindow = await createWindowTask;
-            _logger.LogInfo("✅ RegionSelectionWindow ready");
-
-            // Step 3: Now fade in the overlay
-            _logger.LogInfo("📈 Starting overlay fade in (200ms)");
-            await AnimateFadeIn(regionWindow, 200);
-            _logger.LogInfo("✅ Overlay fade in completed");
+        private void DarkenBitmap(Bitmap bitmap, float factor)
+        {
+            using var graphics = Graphics.FromImage(bitmap);
+            using var darkBrush = new SolidBrush(System.Drawing.Color.FromArgb((int)(255 * (1 - factor)), 0, 0, 0));
+            graphics.FillRectangle(darkBrush, 0, 0, bitmap.Width, bitmap.Height);
         }
 
         private async Task StartSimpleCaptureAsync()
@@ -284,7 +261,7 @@ namespace ScreenshotPro.UI.Views
 
             // Show RegionSelectionWindow immediately
             _logger.LogInfo("🏗️ Showing RegionSelectionWindow immediately");
-            await ShowRegionSelectionOverlay();
+            await ShowRegionSelectionOverlay(desktopBitmap);
             _logger.LogInfo("✅ RegionSelectionWindow shown");
         }
 
@@ -403,20 +380,17 @@ namespace ScreenshotPro.UI.Views
 
 
 
-        private Task ShowRegionSelectionOverlay(Bitmap? desktopBitmap = null)
+        private Task ShowRegionSelectionOverlay(Bitmap desktopBitmap)
         {
             try
             {
-                _logger.LogInfo("🏗️ Creating RegionSelectionWindow");
-                _logger.LogInfo($"⏰ Creating window timestamp: {DateTime.Now:HH:mm:ss.ffffff}");
+                _logger.LogInfo("🏗️ Creating RegionSelectionWindow with darkened desktop");
                 var regionWindow = new RegionSelectionWindow(desktopBitmap);
-                _logger.LogInfo("✅ RegionSelectionWindow created");
 
                 // Set up event handlers
                 regionWindow.RegionSelected += async (sender, e) =>
                 {
                     _logger.LogInfo("🎯 RegionSelected event received");
-                    _logger.LogInfo($"⏰ RegionSelected timestamp: {DateTime.Now:HH:mm:ss.ffffff}");
                     regionWindow.Close();
                     await ProcessSelectedRegion(e.SelectedRegion);
                 };
@@ -424,18 +398,14 @@ namespace ScreenshotPro.UI.Views
                 regionWindow.SelectionCancelled += (sender, e) =>
                 {
                     _logger.LogInfo("❌ SelectionCancelled event received");
-                    _logger.LogInfo($"⏰ SelectionCancelled timestamp: {DateTime.Now:HH:mm:ss.ffffff}");
                     regionWindow.Close();
-                    // Restore main window when cancelled
                     RestoreMainWindow();
                 };
 
                 // Show the region selection overlay
                 _logger.LogInfo("🚀 Activating RegionSelectionWindow");
-                _logger.LogInfo($"⏰ Pre-activate timestamp: {DateTime.Now:HH:mm:ss.ffffff}");
                 regionWindow.Activate();
                 _logger.LogInfo("✅ RegionSelectionWindow activated");
-                _logger.LogInfo($"⏰ Post-activate timestamp: {DateTime.Now:HH:mm:ss.ffffff}");
 
                 return Task.CompletedTask;
             }
