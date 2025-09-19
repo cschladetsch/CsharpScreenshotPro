@@ -22,6 +22,7 @@ namespace ScreenshotPro.UI.Views
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(int nIndex);
 
+
         public ObservableCollection<ScreenshotItem> Screenshots { get; } = new();
 
         public LibraryPage()
@@ -86,31 +87,26 @@ namespace ScreenshotPro.UI.Views
             var mainWindow = App.MainWindow;
             if (mainWindow == null) return;
 
-            // Step 1: IMMEDIATELY hide the main window
-            _logger.LogInfo("⚡ IMMEDIATELY hiding main window");
-            mainWindow.Content.Opacity = 0;
-            mainWindow.AppWindow.Hide();
+            // Step 1: Move window off-screen instantly (faster than hiding)
+            _logger.LogInfo("⚡ Moving window off-screen instantly");
 
-            var presenter = mainWindow.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-            if (presenter != null)
-            {
-                presenter.Minimize();
-            }
+            var appWindow = mainWindow.AppWindow;
+            var originalPosition = appWindow.Position;
+            appWindow.Move(new Windows.Graphics.PointInt32(-5000, -5000));
 
-            // Step 2: Wait for window to be fully hidden
-            _logger.LogInfo("⏳ Ensuring window is fully hidden");
-            await Task.Delay(100); // Give window time to fully hide
+            // Small delay to ensure move is complete
+            await Task.Delay(10);
+            _logger.LogInfo("✅ Window moved off-screen");
 
-            // Step 3: Capture clean desktop into pre-allocated bitmap
-            _logger.LogInfo("📸 Capturing clean desktop into pre-allocated bitmap");
+            // Step 2: Capture clean desktop into pre-allocated bitmap
             var screenRegion = new ScreenshotPro.Core.Models.Region(0, 0, _desktopBitmap.Width, _desktopBitmap.Height);
             await _captureService.CaptureRegionIntoBitmapAsync(screenRegion, _desktopBitmap);
 
-            // Step 4: Darken the desktop bitmap slightly
+            // Step 3: Darken the desktop bitmap slightly
             DarkenBitmap(_desktopBitmap, 0.7f);
             _logger.LogInfo("🌑 Desktop bitmap darkened");
 
-            // Step 5: Enter selection mode with darkened desktop
+            // Step 4: Enter selection mode with darkened desktop
             _logger.LogInfo("🎯 Entering selection mode");
             await ShowRegionSelectionOverlay(_desktopBitmap);
         }
@@ -121,6 +117,7 @@ namespace ScreenshotPro.UI.Views
             using var darkBrush = new SolidBrush(System.Drawing.Color.FromArgb((int)(255 * (1 - factor)), 0, 0, 0));
             graphics.FillRectangle(darkBrush, 0, 0, bitmap.Width, bitmap.Height);
         }
+
 
         private async Task StartSimpleCaptureAsync()
         {
@@ -535,26 +532,19 @@ namespace ScreenshotPro.UI.Views
                 _logger.LogInfo("🔍 RESTORING main window visibility");
                 _logger.LogInfo($"⏰ RestoreMainWindow called at: {DateTime.Now:HH:mm:ss.fff}");
 
-                // Log the call stack to see where this is being called from
-                var stackTrace = new System.Diagnostics.StackTrace();
-                _logger.LogInfo($"📞 RestoreMainWindow called from: {stackTrace.GetFrame(1)?.GetMethod()?.Name}");
-
                 var mainWindow = App.MainWindow;
                 if (mainWindow != null)
                 {
-                    _logger.LogInfo($"🏠 Window state before restore - Opacity: {mainWindow.Content.Opacity}");
+                    // Move window back to center of screen first
+                    var screenWidth = GetSystemMetrics(0);
+                    var screenHeight = GetSystemMetrics(1);
+                    var centerX = (screenWidth - 800) / 2; // Assuming 800px window width
+                    var centerY = (screenHeight - 600) / 2; // Assuming 600px window height
+                    mainWindow.AppWindow.Move(new Windows.Graphics.PointInt32(centerX, centerY));
+                    _logger.LogInfo($"🔧 Window moved back to center: ({centerX}, {centerY})");
 
-                    // Restore opacity
-                    mainWindow.Content.Opacity = 1.0;
-                    _logger.LogInfo("🔧 Opacity restored to 1.0");
-
-                    // Restore from minimized state if needed
-                    var presenter = mainWindow.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-                    if (presenter != null && presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized)
-                    {
-                        presenter.Restore();
-                        _logger.LogInfo("🔧 Presenter.Restore() called");
-                    }
+                    // Restore window visibility - AppWindow.Show() handles this
+                    _logger.LogInfo("🔧 Preparing to show window");
 
                     // Show and activate the window
                     mainWindow.AppWindow.Show();
@@ -563,7 +553,6 @@ namespace ScreenshotPro.UI.Views
                     _logger.LogInfo("🔧 Window.Activate() called");
 
                     _logger.LogInfo("✅ Main window restored and activated");
-                    _logger.LogInfo($"⏰ RestoreMainWindow completed at: {DateTime.Now:HH:mm:ss.fff}");
                 }
             }
             catch (Exception ex)
