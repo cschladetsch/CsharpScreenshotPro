@@ -6,7 +6,7 @@
 
     <Grid Name="MainGrid" Background="Transparent">
         <!-- Desktop screenshot background -->
-        <Image Name="DesktopImage" Stretch="None"/>
+        <Image Name="DesktopImage" Stretch="Fill"/>
 
         <!-- Dimming overlay -->
         <Grid Name="OverlayGrid" Background="#40000000">

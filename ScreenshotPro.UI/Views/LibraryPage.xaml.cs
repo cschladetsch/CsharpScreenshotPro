@@ -90,7 +90,7 @@ namespace ScreenshotPro.UI.Views
             }
         }
 
-        private Task ShowRegionSelectionWindow(List<(ScreenshotCaptureOrchestrator.DisplayInfo Display, Bitmap Bitmap)> displayBitmaps)
+        private async Task ShowRegionSelectionWindow(List<(ScreenshotCaptureOrchestrator.DisplayInfo Display, Bitmap Bitmap)> displayBitmaps)
         {
             try
             {
@@ -111,13 +111,30 @@ namespace ScreenshotPro.UI.Views
                         // Log DPI information
                         _logger.LogInfo($"🖥️ Display {display.Index} DPI: {display.DpiX}x{display.DpiY}, Scale: {display.ScaleFactor:F2}x");
 
-                        // For high DPI displays, we need to position based on logical coordinates
-                        // The display bounds are in physical pixels, but window positioning uses logical coordinates
-                        appWindow.Move(new Windows.Graphics.PointInt32(display.Bounds.X, display.Bounds.Y));
-                        appWindow.Resize(new Windows.Graphics.SizeInt32(display.Bounds.Width, display.Bounds.Height));
+                        // Use Overlapped presenter with manual positioning
+                        appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
+
+                        var presenter = appWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                        if (presenter != null)
+                        {
+                            presenter.SetBorderAndTitleBar(false, false);
+                            presenter.IsAlwaysOnTop = true;
+                            presenter.IsResizable = false;
+                        }
+
+                        // Position and size the window to cover the entire display
+                        appWindow.MoveAndResize(new Windows.Graphics.RectInt32(
+                            display.Bounds.X,
+                            display.Bounds.Y,
+                            display.Bounds.Width,
+                            display.Bounds.Height));
 
                         _logger.LogInfo($"🖥️ Window positioned at ({display.Bounds.X}, {display.Bounds.Y}) with size {display.Bounds.Width}x{display.Bounds.Height}");
-                        _logger.LogInfo($"🖥️ Actual window position: ({appWindow.Position.X}, {appWindow.Position.Y}), size: {appWindow.Size.Width}x{appWindow.Size.Height}");
+
+                        // Force a refresh after positioning
+                        await Task.Delay(10);
+
+                        _logger.LogInfo($"🖥️ Actual window position after MoveAndResize: ({appWindow.Position.X}, {appWindow.Position.Y}), size: {appWindow.Size.Width}x{appWindow.Size.Height}");
                     }
 
                     // THEN bind the correctly-sized bitmap
@@ -171,14 +188,11 @@ namespace ScreenshotPro.UI.Views
                     window.Activate();
                     _logger.LogInfo("✅ RegionSelectionWindow activated for display");
                 }
-
-                return Task.CompletedTask;
             }
             catch (Exception ex)
             {
                 _logger.LogError("❌ Error in ShowRegionSelectionWindow", ex);
                 RestoreMainWindow();
-                return Task.CompletedTask;
             }
         }
 

@@ -37,20 +37,10 @@ namespace ScreenshotPro.UI.Views
             var appWindow = AppWindow;
             if (appWindow != null)
             {
-                // Use Overlapped presenter instead of FullScreen to better handle multi-monitor with different DPI
-                appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
-
                 // Hide from app switcher
                 appWindow.IsShownInSwitchers = false;
 
-                // Make borderless
-                var presenter = appWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-                if (presenter != null)
-                {
-                    presenter.SetBorderAndTitleBar(false, false);
-                    presenter.IsAlwaysOnTop = true;
-                    presenter.IsResizable = false;
-                }
+                // Note: Presenter will be set by the caller (LibraryPage) after positioning
             }
 
             if (desktopBitmap != null)
@@ -289,8 +279,26 @@ namespace ScreenshotPro.UI.Views
 
             if (width > 10 && height > 10)
             {
-                var region = new ScreenshotProRegion((int)left, (int)top, (int)width, (int)height);
-                RegionSelected?.Invoke(this, new RegionSelectedEventArgs(region));
+                // Convert UI coordinates to bitmap coordinates when using Stretch="Fill"
+                if (_backingBitmap != null && DesktopImage.ActualWidth > 0 && DesktopImage.ActualHeight > 0)
+                {
+                    var scaleX = _backingBitmap.Width / DesktopImage.ActualWidth;
+                    var scaleY = _backingBitmap.Height / DesktopImage.ActualHeight;
+
+                    var bitmapLeft = (int)(left * scaleX);
+                    var bitmapTop = (int)(top * scaleY);
+                    var bitmapWidth = (int)(width * scaleX);
+                    var bitmapHeight = (int)(height * scaleY);
+
+                    var region = new ScreenshotProRegion(bitmapLeft, bitmapTop, bitmapWidth, bitmapHeight);
+                    RegionSelected?.Invoke(this, new RegionSelectedEventArgs(region));
+                }
+                else
+                {
+                    // Fallback if scaling can't be determined
+                    var region = new ScreenshotProRegion((int)left, (int)top, (int)width, (int)height);
+                    RegionSelected?.Invoke(this, new RegionSelectedEventArgs(region));
+                }
             }
             else
             {
