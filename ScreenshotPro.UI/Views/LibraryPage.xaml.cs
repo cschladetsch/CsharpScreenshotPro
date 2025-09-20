@@ -377,12 +377,12 @@ namespace ScreenshotPro.UI.Views
 
 
 
-        private Task ShowRegionSelectionOverlay(Bitmap desktopBitmap)
+        private async Task ShowRegionSelectionOverlay(Bitmap desktopBitmap)
         {
             try
             {
                 _logger.LogInfo("🏗️ Creating RegionSelectionWindow with darkened desktop");
-                var regionWindow = new RegionSelectionWindow(desktopBitmap);
+                var regionWindow = new RegionSelectionWindow();
 
                 // Set up event handlers
                 regionWindow.RegionSelected += async (sender, e) =>
@@ -399,18 +399,20 @@ namespace ScreenshotPro.UI.Views
                     RestoreMainWindow();
                 };
 
-                // Show the region selection overlay
+                // Bind bitmap and wait for it to be fully loaded
+                _logger.LogInfo("📸 Loading desktop bitmap into RegionSelectionWindow");
+                await regionWindow.BindDesktopBitmapAsync(desktopBitmap);
+                _logger.LogInfo("✅ Desktop bitmap loaded and rendered");
+
+                // Now show the region selection overlay
                 _logger.LogInfo("🚀 Activating RegionSelectionWindow");
                 regionWindow.Activate();
                 _logger.LogInfo("✅ RegionSelectionWindow activated");
-
-                return Task.CompletedTask;
             }
             catch (Exception ex)
             {
                 _logger.LogError("❌ Error in ShowRegionSelectionOverlay", ex);
                 RestoreMainWindow();
-                return Task.CompletedTask;
             }
         }
 

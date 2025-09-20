@@ -53,6 +53,29 @@ namespace ScreenshotPro.UI.Views
             Content.Focus(FocusState.Programmatic);
         }
 
+        public async Task BindDesktopBitmapAsync(Bitmap bitmap)
+        {
+            lock (_bitmapLock)
+            {
+                _backingBitmap = bitmap;
+                CopyBitmapToSurface(bitmap);
+            }
+
+            // Wait for image to be rendered
+            var tcs = new TaskCompletionSource<bool>();
+            void OnImageOpened(object sender, RoutedEventArgs e)
+            {
+                DesktopImage.ImageOpened -= OnImageOpened;
+                tcs.SetResult(true);
+            }
+
+            DesktopImage.ImageOpened += OnImageOpened;
+
+            // Set a timeout in case ImageOpened doesn't fire
+            var delay = Task.Delay(500);
+            await Task.WhenAny(tcs.Task, delay);
+        }
+
         public void BindDesktopBitmap(Bitmap bitmap)
         {
             lock (_bitmapLock)
