@@ -8,10 +8,16 @@ using System.Runtime.InteropServices;
 using System.Collections.ObjectModel;
 using System.IO;
 using Microsoft.UI.Xaml.Media.Imaging;
+using System.ComponentModel;
+using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Shapes;
+using System.Linq;
 
 namespace ScreenshotPro.UI.Views
 {
-    public sealed partial class LibraryPage : Page
+    public sealed partial class LibraryPage : Page, INotifyPropertyChanged
     {
         private readonly WindowsCaptureService _captureService;
         private readonly SnippetStorageService _storageService;
@@ -22,8 +28,11 @@ namespace ScreenshotPro.UI.Views
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(int nIndex);
 
-
         public ObservableCollection<ScreenshotItem> Screenshots { get; } = new();
+
+        public bool HasSelectedItems => Screenshots.Any(s => s.IsSelected);
+
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         public LibraryPage()
         {
@@ -42,7 +51,7 @@ namespace ScreenshotPro.UI.Views
 
             // Set up Documents/Snippets folder
             var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            _snippetsFolder = Path.Combine(documentsPath, "Snippets");
+            _snippetsFolder = System.IO.Path.Combine(documentsPath, "Snippets");
 
             // Create folder if it doesn't exist
             Directory.CreateDirectory(_snippetsFolder);
@@ -77,6 +86,88 @@ namespace ScreenshotPro.UI.Views
                 _logger.LogError("❌ Capture failed", ex);
                 RestoreMainWindow();
                 await ShowErrorDialog("Capture Failed", $"An error occurred while capturing: {ex.Message}");
+            }
+        }
+
+        private void OpenFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.LogInfo("📂 OPEN FOLDER BUTTON CLICKED!");
+
+                // Ensure the snippets folder exists
+                if (!Directory.Exists(_snippetsFolder))
+                {
+                    Directory.CreateDirectory(_snippetsFolder);
+                }
+
+                // Open the snippets folder in Windows Explorer
+                System.Diagnostics.Process.Start("explorer.exe", _snippetsFolder);
+                _logger.LogInfo($"✅ Opened snippets folder: {_snippetsFolder}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("❌ Failed to open snippets folder", ex);
+            }
+        }
+
+        private void SelectionCircle_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (sender is Ellipse ellipse && ellipse.Tag is ScreenshotItem item)
+            {
+                item.IsSelected = !item.IsSelected;
+                _logger.LogInfo($"📋 Screenshot {item.FileName} selection changed to: {item.IsSelected}");
+
+                // Notify UI that HasSelectedItems may have changed
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasSelectedItems)));
+            }
+        }
+
+        private async void DeleteButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var selectedItems = Screenshots.Where(s => s.IsSelected).ToList();
+                if (!selectedItems.Any())
+                {
+                    _logger.LogInfo("🗑️ Delete button clicked but no items selected");
+                    return;
+                }
+
+                _logger.LogInfo($"🗑️ DELETE BUTTON CLICKED! Deleting {selectedItems.Count} items");
+
+                foreach (var item in selectedItems)
+                {
+                    try
+                    {
+                        // Move file to recycle bin asynchronously
+                        await Task.Run(() =>
+                        {
+                            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
+                                item.FilePath,
+                                Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                                Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                        });
+
+                        _logger.LogInfo($"🗑️ Moved to recycle bin: {item.FileName}");
+
+                        // Remove from UI
+                        Screenshots.Remove(item);
+                    }
+                    catch (Exception fileEx)
+                    {
+                        _logger.LogError($"❌ Failed to delete {item.FileName}", fileEx);
+                    }
+                }
+
+                // Update HasSelectedItems
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasSelectedItems)));
+
+                _logger.LogInfo($"✅ Deleted {selectedItems.Count} items successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("❌ Failed to delete selected items", ex);
             }
         }
 
@@ -490,7 +581,7 @@ namespace ScreenshotPro.UI.Views
 
                 var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".gif", ".bmp" };
                 var files = Directory.GetFiles(_snippetsFolder)
-                    .Where(f => imageExtensions.Contains(Path.GetExtension(f).ToLower()))
+                    .Where(f => imageExtensions.Contains(System.IO.Path.GetExtension(f).ToLower()))
                     .OrderByDescending(f => File.GetCreationTime(f))
                     .ToArray();
 
@@ -500,7 +591,7 @@ namespace ScreenshotPro.UI.Views
                     var item = new ScreenshotItem
                     {
                         FilePath = file,
-                        FileName = Path.GetFileNameWithoutExtension(file),
+                        FileName = System.IO.Path.GetFileNameWithoutExtension(file),
                         CreatedDate = fileInfo.CreationTime,
                         ThumbnailPath = file // For now, use the original file as thumbnail
                     };
@@ -564,14 +655,48 @@ namespace ScreenshotPro.UI.Views
         }
     }
 
-    public class ScreenshotItem
+    public class ScreenshotItem : INotifyPropertyChanged
     {
+        private bool _isSelected;
+
         public string FilePath { get; set; } = string.Empty;
         public string FileName { get; set; } = string.Empty;
         public DateTime CreatedDate { get; set; }
         public string ThumbnailPath { get; set; } = string.Empty;
 
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected != value)
+                {
+                    _isSelected = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+                }
+            }
+        }
+
         public string FormattedDate => CreatedDate.ToString("MMM dd, yyyy h:mm tt");
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+    }
+
+    public class BoolToSelectionBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            if (value is bool isSelected && isSelected)
+            {
+                return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 43, 108, 176)); // Blue fill when selected
+            }
+            return new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)); // Transparent when not selected
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
 

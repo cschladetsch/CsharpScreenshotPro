@@ -30,6 +30,11 @@ namespace ScreenshotPro.UI
             window ??= new Window();
             MainWindow = window;
 
+            // Set window title with build info
+            var buildTime = GetBuildTimestamp();
+            var version = GetVersion();
+            window.Title = $"ScreenshotPro - Build {version} ({buildTime})";
+
             if (window.Content is not Frame rootFrame)
             {
                 rootFrame = new Frame();
@@ -39,6 +44,20 @@ namespace ScreenshotPro.UI
 
             _ = rootFrame.Navigate(typeof(MainPage), e.Arguments);
             window.Activate();
+        }
+
+        private static string GetBuildTimestamp()
+        {
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            var fileInfo = new System.IO.FileInfo(assembly.Location);
+            return fileInfo.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss");
+        }
+
+        private static string GetVersion()
+        {
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            var version = assembly.GetName().Version;
+            return $"{version?.Major}.{version?.Minor}.{version?.Build}";
         }
 
         /// <summary>

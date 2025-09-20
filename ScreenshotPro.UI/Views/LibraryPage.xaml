@@ -8,6 +8,10 @@
     xmlns:local="using:ScreenshotPro.UI.Views"
     mc:Ignorable="d">
 
+    <Page.Resources>
+        <local:BoolToSelectionBrushConverter x:Key="BoolToSelectionBrushConverter"/>
+    </Page.Resources>
+
     <Grid Background="#FF1F1F23" Padding="32">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -25,6 +29,12 @@
                     CornerRadius="8"
                     Click="NewCaptureButton_Click"
                     PointerEntered="NewCaptureButton_PointerEntered"/>
+            <Button Content="Open Folder"
+                    Padding="18,10"
+                    Background="#FF4A5568"
+                    Foreground="White"
+                    CornerRadius="8"
+                    Click="OpenFolderButton_Click"/>
             <ComboBox Width="160" SelectedIndex="0">
                 <ComboBoxItem>All Screenshots</ComboBoxItem>
                 <ComboBoxItem>Last 7 Days</ComboBoxItem>
@@ -32,6 +42,13 @@
             </ComboBox>
             <AutoSuggestBox Width="280"
                             PlaceholderText="Search all screenshots"/>
+            <Button Content="Delete"
+                    Padding="18,10"
+                    Background="#FFE53E3E"
+                    Foreground="White"
+                    CornerRadius="8"
+                    Click="DeleteButton_Click"
+                    IsEnabled="{x:Bind HasSelectedItems, Mode=OneWay}"/>
         </StackPanel>
 
         <Grid Grid.Row="1" Margin="0,24,0,0">
@@ -63,8 +80,26 @@
                         <DataTemplate x:DataType="local:ScreenshotItem">
                             <StackPanel Spacing="6" Width="160">
                                 <Border Background="#FF2F2F35" CornerRadius="12" Height="120">
-                                    <Image Source="{x:Bind ThumbnailPath}"
-                                           Stretch="UniformToFill"/>
+                                    <Grid>
+                                        <Image Source="{x:Bind ThumbnailPath}"
+                                               Stretch="UniformToFill"/>
+                                        <!-- Selection circle in top-right corner -->
+                                        <Border Background="#80000000"
+                                                CornerRadius="12"
+                                                Width="24"
+                                                Height="24"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Margin="6">
+                                            <Ellipse Width="16"
+                                                     Height="16"
+                                                     Stroke="White"
+                                                     StrokeThickness="2"
+                                                     Fill="{x:Bind IsSelected, Converter={StaticResource BoolToSelectionBrushConverter}, Mode=OneWay}"
+                                                     Tapped="SelectionCircle_Tapped"
+                                                     Tag="{x:Bind}"/>
+                                        </Border>
+                                    </Grid>
                                 </Border>
                                 <TextBlock Text="{x:Bind FileName}"
                                            Foreground="White"
