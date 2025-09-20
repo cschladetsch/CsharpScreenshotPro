@@ -1,63 +1,42 @@
-﻿using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml;
 using ScreenshotPro.Core.Services;
-using ScreenshotPro.Core.Interfaces;
 using ScreenshotPro.Core.Models;
-using System.Drawing;
-using System.Runtime.InteropServices;
-using System.Collections.ObjectModel;
-using System.IO;
-using Microsoft.UI.Xaml.Media.Imaging;
 using System.ComponentModel;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Shapes;
-using System.Linq;
+using ScreenshotPro.UI.ViewModels;
+using System.Runtime.InteropServices;
 
 namespace ScreenshotPro.UI.Views
 {
-    public sealed partial class LibraryPage : Page, INotifyPropertyChanged
+    public sealed partial class LibraryPage : Page
     {
-        private readonly WindowsCaptureService _captureService;
-        private readonly SnippetStorageService _storageService;
-        private readonly string _snippetsFolder;
+        private readonly ScreenshotCaptureOrchestrator _captureOrchestrator;
+        private readonly LibraryPageViewModel _viewModel;
         private readonly LoggingService _logger;
-        private readonly Bitmap _desktopBitmap;
 
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(int nIndex);
 
-        public ObservableCollection<ScreenshotItem> Screenshots { get; } = new();
-
-        public bool HasSelectedItems => Screenshots.Any(s => s.IsSelected);
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
         public LibraryPage()
         {
             InitializeComponent();
-            _captureService = new WindowsCaptureService();
-            _storageService = new SnippetStorageService();
+            _captureOrchestrator = new ScreenshotCaptureOrchestrator();
+            _viewModel = new LibraryPageViewModel();
             _logger = LoggingService.Instance;
 
             _logger.LogInfo("LibraryPage constructor started");
 
-            // Pre-allocate desktop bitmap for the entire desktop (including multiple monitors)
-            var screenWidth = GetSystemMetrics(0);
-            var screenHeight = GetSystemMetrics(1);
-            _desktopBitmap = new Bitmap(screenWidth, screenHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            _logger.LogInfo($"Pre-allocated desktop bitmap: {screenWidth}x{screenHeight}");
+            // Event handlers will be set up when creating region selection window
 
-            // Set up Documents/Snippets folder
-            var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            _snippetsFolder = System.IO.Path.Combine(documentsPath, "Snippets");
-
-            // Create folder if it doesn't exist
-            Directory.CreateDirectory(_snippetsFolder);
+            // Bind ViewModel
+            DataContext = _viewModel;
 
             // Load existing screenshots
-            LoadScreenshots();
+            _ = LoadScreenshotsAsync();
 
             _logger.LogInfo($"LibraryPage initialized. Log file: {_logger.GetLogFilePath()}");
         }
@@ -65,8 +44,14 @@ namespace ScreenshotPro.UI.Views
         protected override void OnNavigatedFrom(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
-            _desktopBitmap?.Dispose();
+            _captureOrchestrator?.Dispose();
         }
+
+        private async Task LoadScreenshotsAsync()
+        {
+            await _viewModel.LoadScreenshotsAsync();
+        }
+
 
         private void NewCaptureButton_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
@@ -79,7 +64,15 @@ namespace ScreenshotPro.UI.Views
 
             try
             {
-                await StartSnippingModeAsync();
+                // Move window off-screen before starting capture
+                var mainWindow = App.MainWindow;
+                if (mainWindow != null)
+                {
+                    var appWindow = mainWindow.AppWindow;
+                    appWindow.Move(new Windows.Graphics.PointInt32(-5000, -5000));
+                }
+
+                await _captureOrchestrator.StartSnippingModeAsync();
             }
             catch (Exception ex)
             {
@@ -89,449 +82,56 @@ namespace ScreenshotPro.UI.Views
             }
         }
 
-        private void OpenFolderButton_Click(object sender, RoutedEventArgs e)
+        private async void OpenFolderButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                _logger.LogInfo("📂 OPEN FOLDER BUTTON CLICKED!");
-
-                // Ensure the snippets folder exists
-                if (!Directory.Exists(_snippetsFolder))
-                {
-                    Directory.CreateDirectory(_snippetsFolder);
-                }
-
-                // Open the snippets folder in Windows Explorer
-                System.Diagnostics.Process.Start("explorer.exe", _snippetsFolder);
-                _logger.LogInfo($"✅ Opened snippets folder: {_snippetsFolder}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("❌ Failed to open snippets folder", ex);
-            }
+            _logger.LogInfo("📂 OPEN FOLDER BUTTON CLICKED!");
+            await _viewModel.OpenSnippetsFolderAsync();
         }
 
         private void SelectionCircle_Tapped(object sender, TappedRoutedEventArgs e)
         {
             if (sender is Ellipse ellipse && ellipse.Tag is ScreenshotItem item)
             {
-                item.IsSelected = !item.IsSelected;
-                _logger.LogInfo($"📋 Screenshot {item.FileName} selection changed to: {item.IsSelected}");
-
-                // Notify UI that HasSelectedItems may have changed
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasSelectedItems)));
+                _viewModel.ToggleItemSelection(item);
             }
         }
 
         private async void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
-            try
+            _logger.LogInfo("🗑️ DELETE BUTTON CLICKED!");
+            await _viewModel.DeleteSelectedItemsAsync();
+        }
+
+        private void FileName_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (sender is TextBlock textBlock && textBlock.Tag is ScreenshotItem item)
             {
-                var selectedItems = Screenshots.Where(s => s.IsSelected).ToList();
-                if (!selectedItems.Any())
-                {
-                    _logger.LogInfo("🗑️ Delete button clicked but no items selected");
-                    return;
-                }
-
-                _logger.LogInfo($"🗑️ DELETE BUTTON CLICKED! Deleting {selectedItems.Count} items");
-
-                foreach (var item in selectedItems)
-                {
-                    try
-                    {
-                        // Move file to recycle bin asynchronously
-                        await Task.Run(() =>
-                        {
-                            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
-                                item.FilePath,
-                                Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                                Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-                        });
-
-                        _logger.LogInfo($"🗑️ Moved to recycle bin: {item.FileName}");
-
-                        // Remove from UI
-                        Screenshots.Remove(item);
-                    }
-                    catch (Exception fileEx)
-                    {
-                        _logger.LogError($"❌ Failed to delete {item.FileName}", fileEx);
-                    }
-                }
-
-                // Update HasSelectedItems
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasSelectedItems)));
-
-                _logger.LogInfo($"✅ Deleted {selectedItems.Count} items successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("❌ Failed to delete selected items", ex);
+                _viewModel.StartEditingItem(item);
             }
         }
 
-        private async Task StartSnippingModeAsync()
+        private async void FileNameEdit_KeyDown(object sender, KeyRoutedEventArgs e)
         {
-            _logger.LogInfo("🎯 Starting snipping mode with correct sequence");
-
-            var mainWindow = App.MainWindow;
-            if (mainWindow == null) return;
-
-            // Step 1: Move window off-screen instantly (faster than hiding)
-            _logger.LogInfo("⚡ Moving window off-screen instantly");
-
-            var appWindow = mainWindow.AppWindow;
-            var originalPosition = appWindow.Position;
-            appWindow.Move(new Windows.Graphics.PointInt32(-5000, -5000));
-
-            // Small delay to ensure move is complete
-            await Task.Delay(10);
-            _logger.LogInfo("✅ Window moved off-screen");
-
-            // Step 2: Capture clean desktop into pre-allocated bitmap
-            var screenRegion = new ScreenshotPro.Core.Models.Region(0, 0, _desktopBitmap.Width, _desktopBitmap.Height);
-            await _captureService.CaptureRegionIntoBitmapAsync(screenRegion, _desktopBitmap);
-
-            // Step 3: Darken the desktop bitmap slightly
-            DarkenBitmap(_desktopBitmap, 0.7f);
-            _logger.LogInfo("🌑 Desktop bitmap darkened");
-
-            // Step 4: Enter selection mode with darkened desktop
-            _logger.LogInfo("🎯 Entering selection mode");
-            await ShowRegionSelectionOverlay(_desktopBitmap);
-        }
-
-        private void DarkenBitmap(Bitmap bitmap, float factor)
-        {
-            using var graphics = Graphics.FromImage(bitmap);
-            using var darkBrush = new SolidBrush(System.Drawing.Color.FromArgb((int)(255 * (1 - factor)), 0, 0, 0));
-            graphics.FillRectangle(darkBrush, 0, 0, bitmap.Width, bitmap.Height);
-        }
-
-
-        private async Task StartSimpleCaptureAsync()
-        {
-            _logger.LogInfo("🎯 StartSimpleCaptureAsync called");
-
-            var mainWindow = App.MainWindow;
-            if (mainWindow == null) return;
-
-            var presenter = mainWindow.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-            if (presenter == null) return;
-
-            var screenWidth = GetSystemMetrics(0);
-            var screenHeight = GetSystemMetrics(1);
-            var screenRegion = new ScreenshotPro.Core.Models.Region(0, 0, screenWidth, screenHeight);
-            var desktopBitmap = new Bitmap(screenWidth, screenHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-
-            _logger.LogInfo("🏗️ Pre-creating RegionSelectionWindow with shared desktop bitmap");
-            var regionWindow = new RegionSelectionWindow(desktopBitmap);
-            regionWindow.SuppressOverlayForCapture();
-
-            regionWindow.Closed += (_, _) =>
+            if (sender is TextBox textBox && textBox.Tag is ScreenshotItem item)
             {
-                desktopBitmap.Dispose();
-                _logger.LogInfo("🧹 Disposed shared desktop bitmap after region window closed");
-            };
-
-            regionWindow.RegionSelected += async (sender, e) =>
-            {
-                _logger.LogInfo("✅ RegionSelected event received");
-                regionWindow.Close();
-                await ProcessSelectedRegion(e.SelectedRegion);
-            };
-
-            regionWindow.SelectionCancelled += (sender, e) =>
-            {
-                _logger.LogInfo("ℹ️ SelectionCancelled event received");
-                regionWindow.Close();
-                RestoreMainWindow();
-            };
-
-            _logger.LogInfo("✅ RegionSelectionWindow ready");
-
-            var windowDeactivated = new TaskCompletionSource<bool>();
-
-            void OnWindowActivated(object sender, Microsoft.UI.Xaml.WindowActivatedEventArgs e)
-            {
-                _logger.LogInfo($"🪟 Window activation state: {e.WindowActivationState}");
-                if (e.WindowActivationState == Microsoft.UI.Xaml.WindowActivationState.Deactivated)
+                if (e.Key == Windows.System.VirtualKey.Enter)
                 {
-                    _logger.LogInfo("🪟 Window DEACTIVATED - hiding animation and showing overlay");
-                    mainWindow.Content.Opacity = 0;
-                    mainWindow.AppWindow.Hide();
-
-                    _logger.LogInfo("⚡ Showing overlay immediately");
-                    regionWindow.Activate();
-                    _logger.LogInfo("⚡ Overlay shown instantly");
-
-                    windowDeactivated.TrySetResult(true);
+                    await _viewModel.SaveItemNameAsync(item, textBox.Text);
+                    e.Handled = true;
+                }
+                else if (e.Key == Windows.System.VirtualKey.Escape)
+                {
+                    _viewModel.CancelEditingItem(item);
+                    e.Handled = true;
                 }
             }
-
-            mainWindow.Activated += OnWindowActivated;
-            _logger.LogInfo("🌀 MINIMIZING main window");
-            presenter.Minimize();
-            _logger.LogInfo("🌀 Minimize called");
-
-            _logger.LogInfo("⏳ Waiting for window deactivation and overlay display");
-            await windowDeactivated.Task;
-            mainWindow.Activated -= OnWindowActivated;
-            _logger.LogInfo("✅ Window deactivated and overlay displayed");
-
-            _logger.LogInfo("🔄 Ensuring main window fully hidden before capture");
-            await WaitForWindowToBeHidden(mainWindow);
-
-            regionWindow.SuppressOverlayForCapture();
-
-            try
-            {
-                var captureService = new WindowsCaptureService();
-                _logger.LogInfo("📸 Capturing clean desktop into shared bitmap");
-                await captureService.CaptureRegionIntoBitmapAsync(screenRegion, desktopBitmap);
-                regionWindow.RefreshDesktopBackground();
-                _logger.LogInfo("✅ Desktop background refreshed in overlay");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("❌ Failed to capture clean desktop", ex);
-            }
-            finally
-            {
-                regionWindow.RestoreOverlayAfterCapture();
-            }
-
         }
 
-        private async Task WaitForWindowToBeHidden(Microsoft.UI.Xaml.Window window)
+        private async void FileNameEdit_LostFocus(object sender, RoutedEventArgs e)
         {
-            var maxWait = 1000; // Maximum 1 second
-            var elapsed = 0;
-            var checkInterval = 10; // Check every 10ms
-
-            while (elapsed < maxWait)
+            if (sender is TextBox textBox && textBox.Tag is ScreenshotItem item)
             {
-                // Check if window is actually visible on screen
-                if (!window.Visible || window.Content.Opacity == 0)
-                {
-                    // Add small buffer to ensure window manager has processed the change
-                    await Task.Delay(50);
-                    _logger.LogInfo($"🔍 Window confirmed hidden after {elapsed + 50}ms");
-                    return;
-                }
-
-                await Task.Delay(checkInterval);
-                elapsed += checkInterval;
-                _logger.LogInfo($"⏳ Still waiting for window to hide... {elapsed}ms");
-            }
-
-            _logger.LogInfo("⚠️ Timeout waiting for window to hide, proceeding anyway");
-        }
-
-        private async Task StartInstantCaptureAsync()
-        {
-            _logger.LogInfo("⚡ StartInstantCaptureAsync called");
-            _logger.LogInfo($"⏰ Instant capture timestamp: {DateTime.Now:HH:mm:ss.fff}");
-
-            // Small delay to ensure main window is fully hidden
-            await Task.Delay(50);
-
-            // Capture desktop (main window should be hidden now)
-            var captureService = new WindowsCaptureService();
-            var screenWidth = GetSystemMetrics(0);
-            var screenHeight = GetSystemMetrics(1);
-            var region = new ScreenshotPro.Core.Models.Region(0, 0, screenWidth, screenHeight);
-
-            _logger.LogInfo("🖥️ Capturing desktop with hidden main window");
-            var desktopBitmap = await captureService.CaptureRegionBitmapAsync(region);
-            _logger.LogInfo($"📷 Desktop capture result: {(desktopBitmap != null ? "SUCCESS" : "FAILED")}");
-
-            // Show RegionSelectionWindow immediately
-            _logger.LogInfo("🏗️ Showing RegionSelectionWindow immediately");
-            await ShowRegionSelectionOverlay(desktopBitmap);
-            _logger.LogInfo("✅ RegionSelectionWindow shown");
-        }
-
-        private async Task StartAnimatedSnippingAsync()
-        {
-            _logger.LogInfo("🎬 StartAnimatedSnippingAsync called");
-            _logger.LogInfo($"⏰ Animated snipping timestamp: {DateTime.Now:HH:mm:ss.fff}");
-
-            var mainWindow = App.MainWindow;
-            if (mainWindow == null) return;
-
-            // Capture desktop FIRST (while main window is still visible - this is what we want!)
-            var captureService = new WindowsCaptureService();
-            var screenWidth = GetSystemMetrics(0);
-            var screenHeight = GetSystemMetrics(1);
-            var region = new ScreenshotPro.Core.Models.Region(0, 0, screenWidth, screenHeight);
-
-            _logger.LogInfo("🖥️ Capturing desktop with main window visible");
-            var desktopBitmap = await captureService.CaptureRegionBitmapAsync(region);
-            _logger.LogInfo($"📷 Desktop capture result: {(desktopBitmap != null ? "SUCCESS" : "FAILED")}");
-
-            // Create RegionSelectionWindow but start invisible
-            _logger.LogInfo("🏗️ Creating invisible RegionSelectionWindow");
-            var regionWindow = new RegionSelectionWindow(desktopBitmap);
-
-            // Set up event handlers
-            regionWindow.RegionSelected += async (sender, e) =>
-            {
-                _logger.LogInfo("🎯 RegionSelected event received");
-                regionWindow.Close();
-                await ProcessSelectedRegion(e.SelectedRegion);
-            };
-
-            regionWindow.SelectionCancelled += (sender, e) =>
-            {
-                _logger.LogInfo("❌ SelectionCancelled event received");
-                regionWindow.Close();
-                RestoreMainWindow();
-            };
-
-            // Position and activate region window but keep it invisible initially
-            regionWindow.Content.Opacity = 0;
-            regionWindow.Activate();
-            _logger.LogInfo("🏗️ RegionSelectionWindow activated but invisible");
-
-            // Now start smooth crossfade: fade out main window while fading in overlay
-            _logger.LogInfo("🎭 Starting smooth crossfade animation");
-            var fadeOutTask = AnimateFadeOut(mainWindow, 150);
-            var fadeInTask = AnimateFadeIn(regionWindow, 150);
-
-            await Task.WhenAll(fadeOutTask, fadeInTask);
-            _logger.LogInfo("✅ Smooth crossfade animation completed");
-        }
-
-        private async Task AnimateFadeOut(Microsoft.UI.Xaml.Window window, int durationMs)
-        {
-            _logger.LogInfo($"📉 Animating fade out over {durationMs}ms");
-
-            var startTime = DateTime.Now;
-            while ((DateTime.Now - startTime).TotalMilliseconds < durationMs)
-            {
-                var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
-                var progress = elapsed / durationMs;
-                var opacity = 1.0 - progress;
-
-                window.Content.Opacity = Math.Max(0, opacity);
-                await Task.Delay(16); // ~60fps
-            }
-
-            window.Content.Opacity = 0;
-            window.AppWindow.Hide();
-
-            var presenter = window.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-            if (presenter != null)
-            {
-                presenter.Minimize();
-            }
-
-            _logger.LogInfo("✅ Fade out animation completed");
-        }
-
-        private async Task AnimateFadeIn(RegionSelectionWindow regionWindow, int durationMs)
-        {
-            _logger.LogInfo($"📈 Animating fade in over {durationMs}ms");
-
-            // Start with transparent window
-            regionWindow.Content.Opacity = 0;
-            regionWindow.Activate();
-
-            var startTime = DateTime.Now;
-            while ((DateTime.Now - startTime).TotalMilliseconds < durationMs)
-            {
-                var elapsed = (DateTime.Now - startTime).TotalMilliseconds;
-                var progress = elapsed / durationMs;
-
-                regionWindow.Content.Opacity = progress;
-                await Task.Delay(16); // ~60fps
-            }
-
-            regionWindow.Content.Opacity = 1.0;
-
-            // Ensure proper focus after animation
-            try
-            {
-                regionWindow.Activate();
-                regionWindow.Content.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
-                _logger.LogInfo("✅ RegionSelectionWindow focus set after animation");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("❌ Failed to set focus after animation", ex);
-            }
-
-            _logger.LogInfo("✅ Fade in animation completed");
-        }
-
-
-
-        private async Task ShowRegionSelectionOverlay(Bitmap desktopBitmap)
-        {
-            try
-            {
-                _logger.LogInfo("🏗️ Creating RegionSelectionWindow with darkened desktop");
-                var regionWindow = new RegionSelectionWindow();
-
-                // Set up event handlers
-                regionWindow.RegionSelected += async (sender, e) =>
-                {
-                    _logger.LogInfo("🎯 RegionSelected event received");
-                    regionWindow.Close();
-                    await ProcessSelectedRegion(e.SelectedRegion);
-                };
-
-                regionWindow.SelectionCancelled += (sender, e) =>
-                {
-                    _logger.LogInfo("❌ SelectionCancelled event received");
-                    regionWindow.Close();
-                    RestoreMainWindow();
-                };
-
-                // Bind bitmap and wait for it to be fully loaded
-                _logger.LogInfo("📸 Loading desktop bitmap into RegionSelectionWindow");
-                await regionWindow.BindDesktopBitmapAsync(desktopBitmap);
-                _logger.LogInfo("✅ Desktop bitmap loaded and rendered");
-
-                // Now show the region selection overlay
-                _logger.LogInfo("🚀 Activating RegionSelectionWindow");
-                regionWindow.Activate();
-                _logger.LogInfo("✅ RegionSelectionWindow activated");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("❌ Error in ShowRegionSelectionOverlay", ex);
-                RestoreMainWindow();
-            }
-        }
-
-        private async Task ProcessSelectedRegion(ScreenshotPro.Core.Models.Region region)
-        {
-            try
-            {
-                _logger.LogInfo($"📸 Processing selected region: {region.Size.Width}x{region.Size.Height} at ({region.Left}, {region.Top})");
-
-                // Capture the selected region
-                var bitmap = await _captureService.CaptureRegionBitmapAsync(region);
-                if (bitmap == null)
-                {
-                    _logger.LogError("❌ Failed to capture the selected region");
-                    RestoreMainWindow();
-                    return;
-                }
-
-                // Auto-save the snippet without dialogs
-                await SaveSnippet(bitmap);
-
-                // Restore main window only after successful save
-                RestoreMainWindow();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("❌ Failed to process selected region", ex);
-                RestoreMainWindow();
+                await _viewModel.SaveItemNameAsync(item, textBox.Text);
             }
         }
 
@@ -551,73 +151,6 @@ namespace ScreenshotPro.UI.Views
             await dialog.ShowAsync();
         }
 
-        private async Task SaveSnippet(Bitmap bitmap)
-        {
-            try
-            {
-                var filePath = await _storageService.SaveSnippetAsync(bitmap);
-                bitmap.Dispose();
-
-                _logger.LogInfo($"✅ Snippet saved successfully to: {filePath}");
-
-                // Refresh the screenshots list to show the new capture
-                await RefreshScreenshots();
-            }
-            catch (Exception ex)
-            {
-                bitmap.Dispose();
-                _logger.LogError($"❌ Failed to save snippet", ex);
-            }
-        }
-
-        private void LoadScreenshots()
-        {
-            try
-            {
-                Screenshots.Clear();
-
-                if (!Directory.Exists(_snippetsFolder))
-                    return;
-
-                var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".gif", ".bmp" };
-                var files = Directory.GetFiles(_snippetsFolder)
-                    .Where(f => imageExtensions.Contains(System.IO.Path.GetExtension(f).ToLower()))
-                    .OrderByDescending(f => File.GetCreationTime(f))
-                    .ToArray();
-
-                foreach (var file in files)
-                {
-                    var fileInfo = new FileInfo(file);
-                    var item = new ScreenshotItem
-                    {
-                        FilePath = file,
-                        FileName = System.IO.Path.GetFileNameWithoutExtension(file),
-                        CreatedDate = fileInfo.CreationTime,
-                        ThumbnailPath = file // For now, use the original file as thumbnail
-                    };
-
-                    Screenshots.Add(item);
-                }
-
-                System.Diagnostics.Debug.WriteLine($"Loaded {Screenshots.Count} screenshots from {_snippetsFolder}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading screenshots: {ex.Message}");
-            }
-        }
-
-        private async Task RefreshScreenshots()
-        {
-            await Task.Run(() =>
-            {
-                DispatcherQueue.TryEnqueue(() =>
-                {
-                    LoadScreenshots();
-                });
-            });
-        }
-
         private void RestoreMainWindow()
         {
             try
@@ -628,11 +161,16 @@ namespace ScreenshotPro.UI.Views
                 var mainWindow = App.MainWindow;
                 if (mainWindow != null)
                 {
-                    // Move window back to center of screen first
-                    var screenWidth = GetSystemMetrics(0);
-                    var screenHeight = GetSystemMetrics(1);
-                    var centerX = (screenWidth - 800) / 2; // Assuming 800px window width
-                    var centerY = (screenHeight - 600) / 2; // Assuming 600px window height
+                    // Move window back to center of screen first (using virtual desktop dimensions)
+                    var screenWidth = GetSystemMetrics(78); // SM_CXVIRTUALSCREEN - Width of virtual desktop
+                    var screenHeight = GetSystemMetrics(79); // SM_CYVIRTUALSCREEN - Height of virtual desktop
+
+                    // Get actual window size
+                    var windowWidth = mainWindow.AppWindow.Size.Width;
+                    var windowHeight = mainWindow.AppWindow.Size.Height;
+
+                    var centerX = (screenWidth - windowWidth) / 2;
+                    var centerY = (screenHeight - windowHeight) / 2;
                     mainWindow.AppWindow.Move(new Windows.Graphics.PointInt32(centerX, centerY));
                     _logger.LogInfo($"🔧 Window moved back to center: ({centerX}, {centerY})");
 
@@ -658,6 +196,7 @@ namespace ScreenshotPro.UI.Views
     public class ScreenshotItem : INotifyPropertyChanged
     {
         private bool _isSelected;
+        private bool _isEditing;
 
         public string FilePath { get; set; } = string.Empty;
         public string FileName { get; set; } = string.Empty;
@@ -673,6 +212,19 @@ namespace ScreenshotPro.UI.Views
                 {
                     _isSelected = value;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+                }
+            }
+        }
+
+        public bool IsEditing
+        {
+            get => _isEditing;
+            set
+            {
+                if (_isEditing != value)
+                {
+                    _isEditing = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEditing)));
                 }
             }
         }
@@ -698,10 +250,25 @@ namespace ScreenshotPro.UI.Views
             throw new NotImplementedException();
         }
     }
+
+    public class BoolToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            bool isVisible = value is bool b && b;
+
+            // Check if we should invert the logic
+            if (parameter?.ToString() == "Invert")
+            {
+                isVisible = !isVisible;
+            }
+
+            return isVisible ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }
-
-
-
-
-
-

@@ -10,6 +10,7 @@
 
     <Page.Resources>
         <local:BoolToSelectionBrushConverter x:Key="BoolToSelectionBrushConverter"/>
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
     </Page.Resources>
 
     <Grid Background="#FF1F1F23" Padding="32">
@@ -48,7 +49,7 @@
                     Foreground="White"
                     CornerRadius="8"
                     Click="DeleteButton_Click"
-                    IsEnabled="{x:Bind HasSelectedItems, Mode=OneWay}"/>
+                    IsEnabled="{x:Bind _viewModel.HasSelectedItems, Mode=OneWay}"/>
         </StackPanel>
 
         <Grid Grid.Row="1" Margin="0,24,0,0">
@@ -70,7 +71,7 @@
                 <TextBlock Text="Recent Captures" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
                 <GridView Name="ScreenshotsGridView"
                           SelectionMode="None"
-                          ItemsSource="{x:Bind Screenshots, Mode=OneWay}">
+                          ItemsSource="{x:Bind _viewModel.Screenshots, Mode=OneWay}">
                     <GridView.ItemsPanel>
                         <ItemsPanelTemplate>
                             <ItemsWrapGrid Orientation="Horizontal"/>
@@ -101,9 +102,22 @@
                                         </Border>
                                     </Grid>
                                 </Border>
-                                <TextBlock Text="{x:Bind FileName}"
-                                           Foreground="White"
-                                           TextTrimming="CharacterEllipsis"/>
+                                <Grid>
+                                    <TextBlock Text="{x:Bind FileName}"
+                                               Foreground="White"
+                                               TextTrimming="CharacterEllipsis"
+                                               Visibility="{x:Bind IsEditing, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"
+                                               Tapped="FileName_Tapped"
+                                               Tag="{x:Bind}"/>
+                                    <TextBox Text="{x:Bind FileName, Mode=TwoWay}"
+                                             Foreground="White"
+                                             Background="Transparent"
+                                             BorderBrush="White"
+                                             Visibility="{x:Bind IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"
+                                             KeyDown="FileNameEdit_KeyDown"
+                                             LostFocus="FileNameEdit_LostFocus"
+                                             Tag="{x:Bind}"/>
+                                </Grid>
                                 <TextBlock Text="{x:Bind FormattedDate}"
                                            Foreground="#FFB0B0B5"
                                            FontSize="12"/>

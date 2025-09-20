@@ -85,6 +85,41 @@ public class SnippetStorageService
         });
     }
 
+    public async Task<bool> RenameSnippetAsync(string oldFilePath, string newName)
+    {
+        try
+        {
+            if (!File.Exists(oldFilePath))
+                return false;
+
+            var directory = Path.GetDirectoryName(oldFilePath);
+            var extension = Path.GetExtension(oldFilePath);
+
+            // Ensure the new name has the correct extension
+            if (!newName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            {
+                newName += extension;
+            }
+
+            var newFilePath = Path.Combine(directory!, newName);
+
+            // Check if target file already exists
+            if (File.Exists(newFilePath))
+                return false;
+
+            await Task.Run(() =>
+            {
+                File.Move(oldFilePath, newFilePath);
+            });
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to rename snippet: {ex.Message}", ex);
+        }
+    }
+
     public async Task OpenSnippetsFolderAsync()
     {
         await Task.Run(() =>
