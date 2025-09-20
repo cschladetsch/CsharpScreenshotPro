@@ -1,10 +1,11 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
+using ScreenshotPro.UI.Services;
 
 namespace ScreenshotPro.UI.Views
 {
-    public sealed partial class OcrResultWindow : Window
+    public sealed partial class OcrResultWindow : TrackedWindow
     {
         private string _extractedText = string.Empty;
 

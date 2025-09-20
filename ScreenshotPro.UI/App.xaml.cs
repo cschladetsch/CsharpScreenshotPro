@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml.Navigation;
+using ScreenshotPro.UI.Services;
 
 namespace ScreenshotPro.UI
 {
@@ -60,7 +61,17 @@ namespace ScreenshotPro.UI
             }
 
             _ = rootFrame.Navigate(typeof(MainPage), e.Arguments);
+
+            // Set up handler to close all sub-windows when main window closes
+            window.Closed += OnMainWindowClosed;
+
             window.Activate();
+        }
+
+        private void OnMainWindowClosed(object sender, WindowEventArgs args)
+        {
+            // Close all tracked sub-windows when main window closes
+            WindowTracker.CloseAllWindows();
         }
 
         private static string GetBuildTimestamp()

@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using ScreenshotPro.Core.Services;
+using ScreenshotPro.UI.Services;
 using System;
 using System.Drawing;
 using System.IO;
@@ -14,7 +15,7 @@ using Windows.Storage.Streams;
 
 namespace ScreenshotPro.UI.Views
 {
-    public sealed partial class SnippetViewerWindow : Window
+    public sealed partial class SnippetViewerWindow : TrackedWindow
     {
         private string _filePath;
         private readonly LoggingService _logger;
