@@ -43,6 +43,13 @@
             </ComboBox>
             <AutoSuggestBox Width="280"
                             PlaceholderText="Search all screenshots"/>
+            <Button Content="Open in Paint"
+                    Padding="18,10"
+                    Background="#FF4A5568"
+                    Foreground="White"
+                    CornerRadius="8"
+                    Click="OpenInPaintButton_Click"
+                    IsEnabled="{x:Bind _viewModel.HasSingleSelectedItem, Mode=OneWay}"/>
             <Button Content="Delete"
                     Padding="18,10"
                     Background="#FFE53E3E"
@@ -53,21 +60,6 @@
         </StackPanel>
 
         <Grid Grid.Row="1" Margin="0,24,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <StackPanel Grid.Column="0" Spacing="8">
-                <TextBlock Text="Collections" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
-                <ListView SelectionMode="Single">
-                    <ListViewItem Content="All Screenshots" IsSelected="True"/>
-                    <ListViewItem Content="Organize by Date"/>
-                    <ListViewItem Content="Templates"/>
-                </ListView>
-            </StackPanel>
-
-            <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -136,7 +128,6 @@
                     </GridView.ItemTemplate>
                 </GridView>
                 </ScrollViewer>
-            </Grid>
         </Grid>
     </Grid>
 </Page>

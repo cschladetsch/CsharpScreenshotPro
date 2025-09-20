@@ -4,6 +4,9 @@ using System.IO;
 using ScreenshotPro.Core.Services;
 using ScreenshotPro.UI.Views;
 using Microsoft.UI.Dispatching;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
+using Windows.Storage.Streams;
 
 namespace ScreenshotPro.UI.ViewModels;
 
@@ -18,6 +21,8 @@ public class LibraryPageViewModel : INotifyPropertyChanged
     public ObservableCollection<ScreenshotItem> Screenshots { get; } = new();
 
     public bool HasSelectedItems => Screenshots.Any(s => s.IsSelected);
+
+    public bool HasSingleSelectedItem => Screenshots.Count(s => s.IsSelected) == 1;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -120,6 +125,7 @@ public class LibraryPageViewModel : INotifyPropertyChanged
             }
 
             OnPropertyChanged(nameof(HasSelectedItems));
+            OnPropertyChanged(nameof(HasSingleSelectedItem));
             _logger.LogInfo($"✅ Deleted {selectedItems.Count} items successfully");
             return true;
         }
@@ -137,6 +143,9 @@ public class LibraryPageViewModel : INotifyPropertyChanged
             var filePath = await _storageService.SaveSnippetAsync(bitmap);
             _logger.LogInfo($"✅ Snippet saved successfully to: {filePath}");
 
+            // Copy to clipboard
+            await CopyToClipboardAsync(filePath);
+
             // Refresh the screenshots list to show the new capture
             await LoadScreenshotsAsync();
             return filePath;
@@ -145,6 +154,22 @@ public class LibraryPageViewModel : INotifyPropertyChanged
         {
             _logger.LogError($"❌ Failed to save snippet", ex);
             return null;
+        }
+    }
+
+    private async Task CopyToClipboardAsync(string filePath)
+    {
+        try
+        {
+            var dataPackage = new DataPackage();
+            var storageFile = await StorageFile.GetFileFromPathAsync(filePath);
+            dataPackage.SetBitmap(RandomAccessStreamReference.CreateFromFile(storageFile));
+            Clipboard.SetContent(dataPackage);
+            _logger.LogInfo($"📋 Copied new snippet to clipboard: {Path.GetFileName(filePath)}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("❌ Failed to copy snippet to clipboard", ex);
         }
     }
 
@@ -216,6 +241,7 @@ public class LibraryPageViewModel : INotifyPropertyChanged
         if (e.PropertyName == nameof(ScreenshotItem.IsSelected))
         {
             OnPropertyChanged(nameof(HasSelectedItems));
+            OnPropertyChanged(nameof(HasSingleSelectedItem));
         }
     }
 

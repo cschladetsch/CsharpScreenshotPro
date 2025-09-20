@@ -35,6 +35,23 @@ namespace ScreenshotPro.UI
             var version = GetVersion();
             window.Title = $"ScreenshotPro - Build {version} ({buildTime})";
 
+            // Configure dark mode title bar
+            var appWindow = window.AppWindow;
+            if (appWindow != null)
+            {
+                // Enable dark title bar
+                appWindow.TitleBar.BackgroundColor = Windows.UI.Color.FromArgb(255, 31, 31, 35); // #FF1F1F23
+                appWindow.TitleBar.ForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255); // White text
+                appWindow.TitleBar.InactiveBackgroundColor = Windows.UI.Color.FromArgb(255, 31, 31, 35);
+                appWindow.TitleBar.InactiveForegroundColor = Windows.UI.Color.FromArgb(255, 176, 176, 181); // #FFB0B0B5
+                appWindow.TitleBar.ButtonBackgroundColor = Windows.UI.Color.FromArgb(255, 31, 31, 35);
+                appWindow.TitleBar.ButtonForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
+                appWindow.TitleBar.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(255, 74, 85, 104); // #FF4A5568
+                appWindow.TitleBar.ButtonHoverForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
+                appWindow.TitleBar.ButtonPressedBackgroundColor = Windows.UI.Color.FromArgb(255, 43, 108, 176); // #FF2B6CB0
+                appWindow.TitleBar.ButtonPressedForegroundColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
+            }
+
             if (window.Content is not Frame rootFrame)
             {
                 rootFrame = new Frame();

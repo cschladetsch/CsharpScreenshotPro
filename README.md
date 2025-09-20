@@ -4,9 +4,7 @@ ScreenshotPro is a professional screenshot annotation application built with .NE
 
 ## Mockups
 
-[Mock1](resources/Mock1.jpg)
-[Mock2](resources/Mock2.jpg)
-[Mock3](resources/Mock3.jpg)
+[Demo1](resources/Demo1.gif)
 
 ## Features
 

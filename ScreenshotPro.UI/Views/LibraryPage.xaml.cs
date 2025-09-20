@@ -238,6 +238,31 @@ namespace ScreenshotPro.UI.Views
             await _viewModel.DeleteSelectedItemsAsync();
         }
 
+        private void OpenInPaintButton_Click(object sender, RoutedEventArgs e)
+        {
+            _logger.LogInfo("🎨 OPEN IN PAINT BUTTON CLICKED!");
+
+            var selectedItem = _viewModel.Screenshots.FirstOrDefault(s => s.IsSelected);
+            if (selectedItem != null)
+            {
+                try
+                {
+                    var startInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "mspaint.exe",
+                        Arguments = $"\"{selectedItem.FilePath}\"",
+                        UseShellExecute = true
+                    };
+                    System.Diagnostics.Process.Start(startInfo);
+                    _logger.LogInfo($"🎨 Opened {selectedItem.FileName} in Paint");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Failed to open Paint", ex);
+                }
+            }
+        }
+
         private void FileName_Tapped(object sender, TappedRoutedEventArgs e)
         {
             _logger.LogInfo("🖱️ FileName_Tapped event fired!");
