@@ -31,19 +31,30 @@ namespace ScreenshotPro.UI.Views
             // Set content
             HeaderText.Text = $"Extracted Text ({extractedText.Length} characters, Confidence: {confidence:F1}%)";
 
-            // Set RichTextBlock content - remove hard line breaks for proper wrapping
-            var cleanedText = extractedText.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
-            // Remove multiple spaces
-            while (cleanedText.Contains("  "))
-            {
-                cleanedText = cleanedText.Replace("  ", " ");
-            }
-
-            var paragraph = new Paragraph();
-            var run = new Run { Text = cleanedText.Trim() };
-            paragraph.Inlines.Add(run);
+            // Set RichTextBlock content - preserve paragraphs but allow wrapping
             TextContent.Blocks.Clear();
-            TextContent.Blocks.Add(paragraph);
+
+            // Split text into paragraphs (double line breaks indicate paragraph breaks)
+            var paragraphs = extractedText.Split(new string[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.None);
+
+            foreach (var paragraphText in paragraphs)
+            {
+                if (string.IsNullOrWhiteSpace(paragraphText)) continue;
+
+                // For each paragraph, replace single line breaks with spaces for wrapping
+                var cleanedParagraph = paragraphText.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
+
+                // Remove multiple spaces
+                while (cleanedParagraph.Contains("  "))
+                {
+                    cleanedParagraph = cleanedParagraph.Replace("  ", " ");
+                }
+
+                var paragraph = new Paragraph();
+                var run = new Run { Text = cleanedParagraph.Trim() };
+                paragraph.Inlines.Add(run);
+                TextContent.Blocks.Add(paragraph);
+            }
 
             // Center the window
             CenterOnScreen();

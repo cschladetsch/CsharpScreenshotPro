@@ -215,7 +215,7 @@ namespace ScreenshotPro.UI.Views
 
             _desktopSurface.Invalidate();
             DesktopImage.Opacity = 1;
-            }
+        }
 
         private void Window_KeyDown(object sender, KeyRoutedEventArgs e)
         {

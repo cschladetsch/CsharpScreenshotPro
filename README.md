@@ -16,6 +16,7 @@ ScreenshotPro is a professional screenshot annotation application built with .NE
   - Multi-monitor support
   - Delayed capture (3-10 seconds)
   - Scrolling capture (for web pages and documents)
+  - Uses [Tesseract](https://github.com/charlesw/tesseract) for OCR
 
 ### Advanced Annotation Engine
 - **Drawing Tools**
