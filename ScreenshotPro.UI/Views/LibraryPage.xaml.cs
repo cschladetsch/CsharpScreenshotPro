@@ -135,12 +135,16 @@ namespace ScreenshotPro.UI.Views
                             window.Close();
                         }
 
-                        // Adjust region coordinates to global coordinates if needed
+                        // Convert region coordinates to global coordinates (no DPI scaling needed since Stretch="None")
                         var globalRegion = new ScreenshotProRegion(
                             e.SelectedRegion.Left + display.Bounds.X,
                             e.SelectedRegion.Top + display.Bounds.Y,
                             e.SelectedRegion.Size.Width,
                             e.SelectedRegion.Size.Height);
+
+                        _logger.LogInfo($"🎯 Selected region: {e.SelectedRegion.Left},{e.SelectedRegion.Top} {e.SelectedRegion.Size.Width}x{e.SelectedRegion.Size.Height}");
+                        _logger.LogInfo($"🎯 Display {display.Index} bounds: {display.Bounds.X},{display.Bounds.Y} {display.Bounds.Width}x{display.Bounds.Height}");
+                        _logger.LogInfo($"🎯 Global region: {globalRegion.Left},{globalRegion.Top} {globalRegion.Size.Width}x{globalRegion.Size.Height}");
 
                         await ProcessSelectedRegion(globalRegion);
                     };
@@ -210,6 +214,21 @@ namespace ScreenshotPro.UI.Views
             if (sender is Ellipse ellipse && ellipse.Tag is ScreenshotItem item)
             {
                 _viewModel.ToggleItemSelection(item);
+                e.Handled = true; // Prevent bubble up to Border tap
+            }
+        }
+
+        private void SnippetImage_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (sender is Border border && border.Tag is ScreenshotItem item)
+            {
+                // Only open viewer if not handling selection circle tap
+                if (!e.Handled)
+                {
+                    _logger.LogInfo($"📸 Opening snippet viewer for: {item.FileName}");
+                    var viewerWindow = new SnippetViewerWindow(item.FilePath);
+                    viewerWindow.Activate();
+                }
             }
         }
 

@@ -3,11 +3,13 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using ScreenshotPro.Core.Interfaces;
 using ScreenshotPro.Core.Models;
+using ScreenshotPro.Core.Services;
 
 namespace ScreenshotPro.Core.Services;
 
 public class WindowsCaptureService : ICaptureService
 {
+    private readonly LoggingService _logger = LoggingService.Instance;
     public event EventHandler<CaptureEventArgs>? CaptureCompleted;
 
     [DllImport("user32.dll")]
@@ -144,7 +146,10 @@ public class WindowsCaptureService : ICaptureService
         {
             try
             {
-                return CaptureScreen(region.Left, region.Top, region.Size.Width, region.Size.Height);
+                _logger.LogInfo($"🎯 WindowsCaptureService: Capturing region {region.Left},{region.Top} {region.Size.Width}x{region.Size.Height}");
+                var result = CaptureScreen(region.Left, region.Top, region.Size.Width, region.Size.Height);
+                _logger.LogInfo($"🎯 WindowsCaptureService: Captured bitmap {result?.Width}x{result?.Height}");
+                return result;
             }
             catch (Exception ex)
             {

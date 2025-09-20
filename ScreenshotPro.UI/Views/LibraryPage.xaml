@@ -67,11 +67,19 @@
                 </ListView>
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Spacing="16">
-                <TextBlock Text="Recent Captures" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
-                <GridView Name="ScreenshotsGridView"
-                          SelectionMode="None"
-                          ItemsSource="{x:Bind _viewModel.Screenshots, Mode=OneWay}">
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Recent Captures" FontSize="18" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,16"/>
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <GridView Name="ScreenshotsGridView"
+                              SelectionMode="None"
+                              ItemsSource="{x:Bind _viewModel.Screenshots, Mode=OneWay}">
                     <GridView.ItemsPanel>
                         <ItemsPanelTemplate>
                             <ItemsWrapGrid Orientation="Horizontal"/>
@@ -79,11 +87,13 @@
                     </GridView.ItemsPanel>
                     <GridView.ItemTemplate>
                         <DataTemplate x:DataType="local:ScreenshotItem">
-                            <StackPanel Spacing="6" Width="160">
-                                <Border Background="#FF2F2F35" CornerRadius="12" Height="120">
+                            <StackPanel Spacing="6" Width="160" Height="170">
+                                <Border Background="#FF2F2F35" CornerRadius="12" Height="120"
+                                        Tapped="SnippetImage_Tapped"
+                                        Tag="{x:Bind}">
                                     <Grid>
                                         <Image Source="{x:Bind ThumbnailPath}"
-                                               Stretch="UniformToFill"/>
+                                               Stretch="Uniform"/>
                                         <!-- Selection circle in top-right corner -->
                                         <Border Background="#80000000"
                                                 CornerRadius="12"
@@ -125,7 +135,8 @@
                         </DataTemplate>
                     </GridView.ItemTemplate>
                 </GridView>
-            </StackPanel>
+                </ScrollViewer>
+            </Grid>
         </Grid>
     </Grid>
 </Page>
