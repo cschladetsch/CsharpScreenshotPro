@@ -76,11 +76,11 @@ namespace ScreenshotPro.UI.Views
                     appWindow.Move(new Windows.Graphics.PointInt32(-5000, -5000));
                 }
 
-                // Prepare the desktop bitmap
-                var desktopBitmap = await _captureOrchestrator.PrepareDesktopBitmapAsync();
+                // Prepare the desktop bitmaps for all displays
+                var displayBitmaps = await _captureOrchestrator.PrepareDesktopBitmapsAsync();
 
-                // Create and show the region selection window
-                await ShowRegionSelectionWindow(desktopBitmap);
+                // Create and show the region selection window for all displays
+                await ShowRegionSelectionWindow(displayBitmaps);
             }
             catch (Exception ex)
             {
@@ -90,32 +90,84 @@ namespace ScreenshotPro.UI.Views
             }
         }
 
-        private Task ShowRegionSelectionWindow(Bitmap desktopBitmap)
+        private Task ShowRegionSelectionWindow(List<(ScreenshotCaptureOrchestrator.DisplayInfo Display, Bitmap Bitmap)> displayBitmaps)
         {
             try
             {
-                _logger.LogInfo("🏗️ Creating RegionSelectionWindow with darkened desktop");
-                var regionWindow = new RegionSelectionWindow(desktopBitmap);
+                _logger.LogInfo($"🏗️ Creating {displayBitmaps.Count} RegionSelectionWindows for each display");
+                var regionWindows = new List<RegionSelectionWindow>();
 
-                // Set up event handlers
-                regionWindow.RegionSelected += async (sender, e) =>
+                foreach (var (display, bitmap) in displayBitmaps)
                 {
-                    _logger.LogInfo("🎯 RegionSelected event received");
-                    regionWindow.Close();
-                    await ProcessSelectedRegion((ScreenshotProRegion)e.SelectedRegion);
-                };
+                    _logger.LogInfo($"🖥️ Creating RegionSelectionWindow for display {display.Index}: {display.Bounds}");
+                    _logger.LogInfo($"🖥️ Bitmap dimensions for display {display.Index}: {bitmap.Width}x{bitmap.Height}");
 
-                regionWindow.SelectionCancelled += (sender, e) =>
+                    var regionWindow = new RegionSelectionWindow();
+
+                    // Position and size the window exactly for this display FIRST
+                    var appWindow = regionWindow.AppWindow;
+                    if (appWindow != null)
+                    {
+                        // Log DPI information
+                        _logger.LogInfo($"🖥️ Display {display.Index} DPI: {display.DpiX}x{display.DpiY}, Scale: {display.ScaleFactor:F2}x");
+
+                        // For high DPI displays, we need to position based on logical coordinates
+                        // The display bounds are in physical pixels, but window positioning uses logical coordinates
+                        appWindow.Move(new Windows.Graphics.PointInt32(display.Bounds.X, display.Bounds.Y));
+                        appWindow.Resize(new Windows.Graphics.SizeInt32(display.Bounds.Width, display.Bounds.Height));
+
+                        _logger.LogInfo($"🖥️ Window positioned at ({display.Bounds.X}, {display.Bounds.Y}) with size {display.Bounds.Width}x{display.Bounds.Height}");
+                        _logger.LogInfo($"🖥️ Actual window position: ({appWindow.Position.X}, {appWindow.Position.Y}), size: {appWindow.Size.Width}x{appWindow.Size.Height}");
+                    }
+
+                    // THEN bind the correctly-sized bitmap
+                    regionWindow.BindDesktopBitmap(bitmap);
+                    _logger.LogInfo($"🖥️ Bound {bitmap.Width}x{bitmap.Height} bitmap to window for display {display.Index}");
+
+                    // Set up event handlers
+                    regionWindow.RegionSelected += async (sender, e) =>
+                    {
+                        _logger.LogInfo($"🎯 RegionSelected event received from display {display.Index}");
+
+                        // Close all windows
+                        foreach (var window in regionWindows)
+                        {
+                            window.Close();
+                        }
+
+                        // Adjust region coordinates to global coordinates if needed
+                        var globalRegion = new ScreenshotProRegion(
+                            e.SelectedRegion.Left + display.Bounds.X,
+                            e.SelectedRegion.Top + display.Bounds.Y,
+                            e.SelectedRegion.Size.Width,
+                            e.SelectedRegion.Size.Height);
+
+                        await ProcessSelectedRegion(globalRegion);
+                    };
+
+                    regionWindow.SelectionCancelled += (sender, e) =>
+                    {
+                        _logger.LogInfo($"❌ SelectionCancelled event received from display {display.Index}");
+
+                        // Close all windows
+                        foreach (var window in regionWindows)
+                        {
+                            window.Close();
+                        }
+
+                        RestoreMainWindow();
+                    };
+
+                    regionWindows.Add(regionWindow);
+                }
+
+                // Activate all windows
+                foreach (var window in regionWindows)
                 {
-                    _logger.LogInfo("❌ SelectionCancelled event received");
-                    regionWindow.Close();
-                    RestoreMainWindow();
-                };
+                    window.Activate();
+                    _logger.LogInfo("✅ RegionSelectionWindow activated for display");
+                }
 
-                // Show the region selection window
-                _logger.LogInfo("🚀 Activating RegionSelectionWindow");
-                regionWindow.Activate();
-                _logger.LogInfo("✅ RegionSelectionWindow activated");
                 return Task.CompletedTask;
             }
             catch (Exception ex)

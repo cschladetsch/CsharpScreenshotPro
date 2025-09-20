@@ -6,7 +6,7 @@
 
     <Grid Name="MainGrid" Background="Transparent">
         <!-- Desktop screenshot background -->
-        <Image Name="DesktopImage" Stretch="Fill"/>
+        <Image Name="DesktopImage" Stretch="UniformToFill"/>
 
         <!-- Dimming overlay -->
         <Grid Name="OverlayGrid" Background="#40000000">
@@ -19,14 +19,6 @@
                            Visibility="Collapsed"/>
             </Canvas>
 
-            <!-- Instructions text -->
-            <TextBlock Text="Click and drag to select a region. Press ESC to cancel."
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Top"
-                       Margin="0,50,0,0"
-                       Foreground="White"
-                       FontSize="16"
-                       FontWeight="SemiBold"/>
         </Grid>
     </Grid>
 </Window>

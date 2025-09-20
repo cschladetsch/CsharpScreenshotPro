@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using ScreenshotProRegion = ScreenshotPro.Core.Models.Region;
+using ScreenshotPro.Core.Services;
 using System;
 using System.Buffers;
 using System.Drawing;
@@ -36,8 +37,20 @@ namespace ScreenshotPro.UI.Views
             var appWindow = AppWindow;
             if (appWindow != null)
             {
-                appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+                // Use Overlapped presenter instead of FullScreen to better handle multi-monitor with different DPI
+                appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
+
+                // Hide from app switcher
                 appWindow.IsShownInSwitchers = false;
+
+                // Make borderless
+                var presenter = appWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                if (presenter != null)
+                {
+                    presenter.SetBorderAndTitleBar(false, false);
+                    presenter.IsAlwaysOnTop = true;
+                    presenter.IsResizable = false;
+                }
             }
 
             if (desktopBitmap != null)
@@ -52,6 +65,8 @@ namespace ScreenshotPro.UI.Views
             Content.KeyDown += Window_KeyDown;
             Content.Focus(FocusState.Programmatic);
         }
+
+
 
         public async Task BindDesktopBitmapAsync(Bitmap bitmap)
         {
