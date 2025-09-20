@@ -6,6 +6,7 @@ using ScreenshotPro.Core.Services;
 using System;
 using System.Drawing;
 using System.IO;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
@@ -208,6 +209,20 @@ namespace ScreenshotPro.UI.Views
             FileNameText.Visibility = Visibility.Visible;
         }
 
+        private string GetImageHash(Bitmap bitmap)
+        {
+            using (var ms = new MemoryStream())
+            {
+                bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                ms.Position = 0;
+                using (var sha256 = SHA256.Create())
+                {
+                    var hash = sha256.ComputeHash(ms);
+                    return Convert.ToHexString(hash)[..16]; // First 16 chars for brevity
+                }
+            }
+        }
+
         private void ExtractTextButton_Click(object sender, RoutedEventArgs e)
         {
             _logger.LogInfo("📝 EXTRACT TEXT BUTTON CLICKED in SnippetViewer!");
@@ -235,11 +250,19 @@ namespace ScreenshotPro.UI.Views
                         _logger.LogInfo($"🔍 SnippetViewer - Processing SELECTED image: {Path.GetFileName(_filePath)}");
 
                         // Save a debug copy to verify we're loading the right image
-                        var debugPath = Path.Combine(Path.GetDirectoryName(_filePath), $"DEBUG_VIEWER_{Path.GetFileName(_filePath)}");
+                        var debugDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "OCR_Debug");
+                        Directory.CreateDirectory(debugDir);
+                        var debugPath = Path.Combine(debugDir, $"DEBUG_VIEWER_{DateTime.Now:yyyyMMdd_HHmmss}_{Path.GetFileName(_filePath)}");
                         bitmap.Save(debugPath);
                         _logger.LogInfo($"🔍 Debug image saved to: {debugPath}");
 
+                        // Also log the actual pixel data hash to verify we're processing different images
+                        var pixelHash = GetImageHash(bitmap);
+                        _logger.LogInfo($"🔍 Image pixel hash: {pixelHash}");
+
                         var ocrResult = freshOcrService.ExtractTextWithConfidence(bitmap);
+                        _logger.LogInfo($"📝 SnippetViewer OCR RAW RESULT: '{ocrResult.Text}' (Length: {ocrResult.Text.Length}, Confidence: {ocrResult.Confidence:F1}%)");
+
                         if (!string.IsNullOrWhiteSpace(ocrResult.Text))
                         {
                             // Log the full text for debugging

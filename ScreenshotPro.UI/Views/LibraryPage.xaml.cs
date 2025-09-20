@@ -10,6 +10,8 @@ using Microsoft.UI.Xaml.Shapes;
 using ScreenshotPro.UI.ViewModels;
 using System.Runtime.InteropServices;
 using System.Drawing;
+using System.IO;
+using System.Security.Cryptography;
 using ScreenshotProRegion = ScreenshotPro.Core.Models.Region;
 
 namespace ScreenshotPro.UI.Views
@@ -335,21 +337,34 @@ namespace ScreenshotPro.UI.Views
                     // Load the image from file
                     using (var bitmap = new System.Drawing.Bitmap(selectedItem.FilePath))
                     {
-                        _logger.LogInfo($"🖼️ Image loaded: {bitmap.Width}x{bitmap.Height} pixels, Format: {bitmap.PixelFormat}");
-                        _logger.LogInfo($"🔍 Processing image from: {selectedItem.FilePath}");
+                        _logger.LogInfo($"🖼️ LibraryPage - Image loaded: {bitmap.Width}x{bitmap.Height} pixels, Format: {bitmap.PixelFormat}");
+                        _logger.LogInfo($"🔍 LibraryPage - Processing image from: {selectedItem.FilePath}");
+
+                        // Save a debug copy to verify we're loading the right image
+                        var debugDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "OCR_Debug");
+                        Directory.CreateDirectory(debugDir);
+                        var debugPath = System.IO.Path.Combine(debugDir, $"DEBUG_LIBRARY_{DateTime.Now:yyyyMMdd_HHmmss}_{selectedItem.FileName}");
+                        bitmap.Save(debugPath);
+                        _logger.LogInfo($"🔍 LibraryPage Debug image saved to: {debugPath}");
+
+                        // Also log the actual pixel data hash to verify we're processing different images
+                        var pixelHash = GetImageHash(bitmap);
+                        _logger.LogInfo($"🔍 LibraryPage Image pixel hash: {pixelHash}");
 
                         var ocrResult = _ocrService.ExtractTextWithConfidence(bitmap);
+                        _logger.LogInfo($"📝 LibraryPage OCR RAW RESULT: '{ocrResult.Text}' (Length: {ocrResult.Text.Length}, Confidence: {ocrResult.Confidence:F1}%)");
+
                         if (!string.IsNullOrWhiteSpace(ocrResult.Text))
                         {
                             // Log the full text for debugging
-                            _logger.LogInfo($"📝 OCR extracted {ocrResult.Text.Length} characters from {selectedItem.FileName}: {ocrResult.Text.Substring(0, Math.Min(100, ocrResult.Text.Length))}...");
+                            _logger.LogInfo($"📝 LibraryPage OCR extracted {ocrResult.Text.Length} characters from {selectedItem.FileName}: {ocrResult.Text.Substring(0, Math.Min(100, ocrResult.Text.Length))}...");
 
                             // Copy extracted text to clipboard
                             var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
                             dataPackage.SetText(ocrResult.Text);
                             Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
 
-                            _logger.LogInfo($"📋 OCR Text copied to clipboard from {selectedItem.FileName} (Confidence: {ocrResult.Confidence:F1}%)");
+                            _logger.LogInfo($"📋 LibraryPage OCR Text copied to clipboard from {selectedItem.FileName} (Confidence: {ocrResult.Confidence:F1}%)");
 
                             // Show the extracted text in a new window
                             ShowOcrResultWindow(ocrResult.Text, ocrResult.Confidence, selectedItem.FileName);
@@ -380,6 +395,20 @@ namespace ScreenshotPro.UI.Views
                 XamlRoot = this.XamlRoot
             };
             await dialog.ShowAsync();
+        }
+
+        private string GetImageHash(Bitmap bitmap)
+        {
+            using (var ms = new MemoryStream())
+            {
+                bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                ms.Position = 0;
+                using (var sha256 = SHA256.Create())
+                {
+                    var hash = sha256.ComputeHash(ms);
+                    return Convert.ToHexString(hash)[..16]; // First 16 chars for brevity
+                }
+            }
         }
 
         private void ShowOcrResultWindow(string extractedText, float confidence, string fileName = "")
