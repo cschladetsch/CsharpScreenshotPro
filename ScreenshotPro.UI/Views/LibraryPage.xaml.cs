@@ -20,6 +20,7 @@ namespace ScreenshotPro.UI.Views
         private readonly LibraryPageViewModel _viewModel;
         private readonly LoggingService _logger;
         private Windows.Graphics.PointInt32 _originalWindowPosition;
+        private OcrService? _ocrService;
 
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(int nIndex);
@@ -203,6 +204,36 @@ namespace ScreenshotPro.UI.Views
                 var bitmap = await _captureOrchestrator.ProcessSelectedRegionAsync(region);
                 if (bitmap != null)
                 {
+                    // Extract text using OCR
+                    try
+                    {
+                        if (_ocrService == null)
+                        {
+                            _ocrService = new OcrService();
+                        }
+
+                        _logger.LogInfo($"🔄 Running automatic OCR on captured screenshot...");
+                        var ocrResult = _ocrService.ExtractTextWithConfidence(bitmap);
+                        if (!string.IsNullOrWhiteSpace(ocrResult.Text))
+                        {
+                            // Copy extracted text to clipboard
+                            var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                            dataPackage.SetText(ocrResult.Text);
+                            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+
+                            _logger.LogInfo($"📋 Automatic OCR: {ocrResult.Text.Length} characters copied to clipboard (Confidence: {ocrResult.Confidence:F1}%)");
+                            _logger.LogInfo($"📝 Auto-OCR preview: {ocrResult.Text.Substring(0, Math.Min(100, ocrResult.Text.Length))}...");
+                        }
+                        else
+                        {
+                            _logger.LogInfo("📋 Automatic OCR: No text found in screenshot");
+                        }
+                    }
+                    catch (Exception ocrEx)
+                    {
+                        _logger.LogError("OCR failed", ocrEx);
+                    }
+
                     await _viewModel.SaveSnippetAsync(bitmap);
                     bitmap.Dispose();
                 }
@@ -275,6 +306,86 @@ namespace ScreenshotPro.UI.Views
                     _logger.LogError("Failed to open Paint", ex);
                 }
             }
+        }
+
+        private async void ExtractTextButton_Click(object sender, RoutedEventArgs e)
+        {
+            _logger.LogInfo("📝 EXTRACT TEXT BUTTON CLICKED!");
+
+            var selectedItem = _viewModel.Screenshots.FirstOrDefault(s => s.IsSelected);
+            if (selectedItem != null)
+            {
+                try
+                {
+                    if (_ocrService == null)
+                    {
+                        _ocrService = new OcrService();
+                    }
+
+                    _logger.LogInfo($"🖼️ Loading image: {selectedItem.FilePath}");
+
+                    // Verify file exists
+                    if (!System.IO.File.Exists(selectedItem.FilePath))
+                    {
+                        _logger.LogError($"❌ Image file not found: {selectedItem.FilePath}");
+                        await ShowOcrNotificationAsync($"Image file not found: {selectedItem.FilePath}");
+                        return;
+                    }
+
+                    // Load the image from file
+                    using (var bitmap = new System.Drawing.Bitmap(selectedItem.FilePath))
+                    {
+                        _logger.LogInfo($"🖼️ Image loaded: {bitmap.Width}x{bitmap.Height} pixels, Format: {bitmap.PixelFormat}");
+                        _logger.LogInfo($"🔍 Processing image from: {selectedItem.FilePath}");
+
+                        var ocrResult = _ocrService.ExtractTextWithConfidence(bitmap);
+                        if (!string.IsNullOrWhiteSpace(ocrResult.Text))
+                        {
+                            // Log the full text for debugging
+                            _logger.LogInfo($"📝 OCR extracted {ocrResult.Text.Length} characters from {selectedItem.FileName}: {ocrResult.Text.Substring(0, Math.Min(100, ocrResult.Text.Length))}...");
+
+                            // Copy extracted text to clipboard
+                            var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                            dataPackage.SetText(ocrResult.Text);
+                            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+
+                            _logger.LogInfo($"📋 OCR Text copied to clipboard from {selectedItem.FileName} (Confidence: {ocrResult.Confidence:F1}%)");
+
+                            // Show the extracted text in a new window
+                            ShowOcrResultWindow(ocrResult.Text, ocrResult.Confidence, selectedItem.FileName);
+                        }
+                        else
+                        {
+                            _logger.LogInfo("No text found in image");
+                            await ShowOcrNotificationAsync("No text found in the selected image.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Failed to extract text", ex);
+                    await ShowOcrNotificationAsync($"Failed to extract text: {ex.Message}");
+                }
+            }
+        }
+
+        private async Task ShowOcrNotificationAsync(string message)
+        {
+            // Create a simple content dialog to show the OCR result
+            var dialog = new ContentDialog
+            {
+                Title = "OCR Result",
+                Content = message,
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+
+        private void ShowOcrResultWindow(string extractedText, float confidence, string fileName = "")
+        {
+            var ocrWindow = new OcrResultWindow(extractedText, confidence, fileName);
+            ocrWindow.Activate();
         }
 
         private void FileName_Tapped(object sender, TappedRoutedEventArgs e)

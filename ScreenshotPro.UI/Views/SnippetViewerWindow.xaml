@@ -52,6 +52,12 @@
                         VerticalAlignment="Center"
                         Spacing="8"
                         Margin="16,0">
+                <Button Content="Extract Text"
+                        Click="ExtractTextButton_Click"
+                        Padding="12,6"
+                        Background="#FF6B46C1"
+                        Foreground="White"
+                        CornerRadius="4"/>
                 <Button Content="Copy"
                         Click="CopyButton_Click"
                         Padding="12,6"

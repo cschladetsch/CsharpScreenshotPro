@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using ScreenshotPro.Core.Services;
 using System;
+using System.Drawing;
 using System.IO;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
@@ -18,6 +19,7 @@ namespace ScreenshotPro.UI.Views
         private string _filePath;
         private readonly LoggingService _logger;
         private readonly SnippetFileEditor _fileEditor;
+        private OcrService _ocrService;
 
         public SnippetViewerWindow(string filePath)
         {
@@ -25,6 +27,7 @@ namespace ScreenshotPro.UI.Views
             _filePath = filePath;
             _logger = LoggingService.Instance;
             _fileEditor = new SnippetFileEditor(new SnippetStorageService());
+            _ocrService = new OcrService();
 
             // Set window title
             Title = Path.GetFileName(filePath);
@@ -203,6 +206,69 @@ namespace ScreenshotPro.UI.Views
         {
             FileNameEditBox.Visibility = Visibility.Collapsed;
             FileNameText.Visibility = Visibility.Visible;
+        }
+
+        private void ExtractTextButton_Click(object sender, RoutedEventArgs e)
+        {
+            _logger.LogInfo("📝 EXTRACT TEXT BUTTON CLICKED in SnippetViewer!");
+
+            try
+            {
+                _logger.LogInfo($"🖼️ SnippetViewer OCR - Loading image: {_filePath}");
+                _logger.LogInfo($"🖼️ File exists check: {File.Exists(_filePath)}");
+                _logger.LogInfo($"🖼️ File size: {new FileInfo(_filePath).Length} bytes");
+
+                // Verify file exists
+                if (!File.Exists(_filePath))
+                {
+                    _logger.LogError($"❌ Image file not found: {_filePath}");
+                    return;
+                }
+
+                // Create a NEW OCR service instance to avoid any caching
+                using (var freshOcrService = new OcrService())
+                {
+                    // Load the image from file
+                    using (var bitmap = new Bitmap(_filePath))
+                    {
+                        _logger.LogInfo($"🖼️ SnippetViewer - Image loaded: {bitmap.Width}x{bitmap.Height} pixels, Format: {bitmap.PixelFormat}");
+                        _logger.LogInfo($"🔍 SnippetViewer - Processing SELECTED image: {Path.GetFileName(_filePath)}");
+
+                        // Save a debug copy to verify we're loading the right image
+                        var debugPath = Path.Combine(Path.GetDirectoryName(_filePath), $"DEBUG_VIEWER_{Path.GetFileName(_filePath)}");
+                        bitmap.Save(debugPath);
+                        _logger.LogInfo($"🔍 Debug image saved to: {debugPath}");
+
+                        var ocrResult = freshOcrService.ExtractTextWithConfidence(bitmap);
+                        if (!string.IsNullOrWhiteSpace(ocrResult.Text))
+                        {
+                            // Log the full text for debugging
+                            _logger.LogInfo($"📝 SnippetViewer OCR extracted {ocrResult.Text.Length} characters from {Path.GetFileName(_filePath)}: {ocrResult.Text.Substring(0, Math.Min(100, ocrResult.Text.Length))}...");
+
+                            // Copy extracted text to clipboard
+                            var dataPackage = new DataPackage();
+                            dataPackage.SetText(ocrResult.Text);
+                            Clipboard.SetContent(dataPackage);
+
+                            _logger.LogInfo($"📋 SnippetViewer OCR Text copied to clipboard from {Path.GetFileName(_filePath)} (Confidence: {ocrResult.Confidence:F1}%)");
+
+                            // Show the extracted text in a new window
+                            var ocrWindow = new OcrResultWindow(ocrResult.Text, ocrResult.Confidence, Path.GetFileName(_filePath));
+                            ocrWindow.Activate();
+                        }
+                        else
+                        {
+                            _logger.LogInfo("SnippetViewer OCR: No text found in image");
+                            // Could add a simple notification here if needed
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to extract text", ex);
+                // Could add error notification here if needed
+            }
         }
     }
 }

@@ -50,6 +50,13 @@
                     CornerRadius="8"
                     Click="OpenInPaintButton_Click"
                     IsEnabled="{x:Bind _viewModel.HasSingleSelectedItem, Mode=OneWay}"/>
+            <Button Content="Extract Text (OCR)"
+                    Padding="18,10"
+                    Background="#FF6B46C1"
+                    Foreground="White"
+                    CornerRadius="8"
+                    Click="ExtractTextButton_Click"
+                    IsEnabled="{x:Bind _viewModel.HasSingleSelectedItem, Mode=OneWay}"/>
             <Button Content="Delete"
                     Padding="18,10"
                     Background="#FFE53E3E"

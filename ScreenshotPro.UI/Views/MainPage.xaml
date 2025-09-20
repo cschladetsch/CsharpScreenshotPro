@@ -12,6 +12,7 @@
                     IsBackEnabled="False"
                     IsSettingsVisible="False"
                     PaneDisplayMode="Left"
+                    IsPaneOpen="False"
                     ItemInvoked="RootNav_ItemInvoked"
                     Loaded="RootNav_Loaded">
         <NavigationView.MenuItems>
