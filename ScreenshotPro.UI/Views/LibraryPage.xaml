@@ -103,17 +103,17 @@
                                     </Grid>
                                 </Border>
                                 <Grid>
-                                    <TextBlock Text="{x:Bind FileName}"
+                                    <TextBlock Text="{x:Bind FileName, Mode=OneWay}"
                                                Foreground="White"
                                                TextTrimming="CharacterEllipsis"
-                                               Visibility="{x:Bind IsEditing, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"
+                                               Visibility="{x:Bind IsEditing, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert, Mode=OneWay}"
                                                Tapped="FileName_Tapped"
                                                Tag="{x:Bind}"/>
                                     <TextBox Text="{x:Bind FileName, Mode=TwoWay}"
                                              Foreground="White"
                                              Background="Transparent"
                                              BorderBrush="White"
-                                             Visibility="{x:Bind IsEditing, Converter={StaticResource BoolToVisibilityConverter}}"
+                                             Visibility="{x:Bind IsEditing, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}"
                                              KeyDown="FileNameEdit_KeyDown"
                                              LostFocus="FileNameEdit_LostFocus"
                                              Tag="{x:Bind}"/>

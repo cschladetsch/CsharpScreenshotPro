@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using ScreenshotPro.Core.Services;
 using ScreenshotPro.UI.Views;
+using Microsoft.UI.Dispatching;
 
 namespace ScreenshotPro.UI.ViewModels;
 
@@ -12,6 +13,7 @@ public class LibraryPageViewModel : INotifyPropertyChanged
     private readonly SnippetFileEditor _fileEditor;
     private readonly LoggingService _logger;
     private readonly string _snippetsFolder;
+    private readonly DispatcherQueue _dispatcherQueue;
 
     public ObservableCollection<ScreenshotItem> Screenshots { get; } = new();
 
@@ -24,49 +26,62 @@ public class LibraryPageViewModel : INotifyPropertyChanged
         _storageService = new SnippetStorageService();
         _fileEditor = new SnippetFileEditor(_storageService);
         _logger = LoggingService.Instance;
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
-        // Set up Documents/Snippets folder
-        var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        // Set up Documents/Snippets folder - check for OneDrive first
+        var documentsPath = GetDocumentsPath();
         _snippetsFolder = Path.Combine(documentsPath, "Snippets");
         Directory.CreateDirectory(_snippetsFolder);
+
+        _logger.LogInfo($"📁 Using Snippets folder: {_snippetsFolder}");
     }
 
     public async Task LoadScreenshotsAsync()
     {
-        try
+        await Task.Run(() =>
         {
-            Screenshots.Clear();
-
-            if (!Directory.Exists(_snippetsFolder))
-                return;
-
-            var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".gif", ".bmp" };
-            var files = Directory.GetFiles(_snippetsFolder)
-                .Where(f => imageExtensions.Contains(Path.GetExtension(f).ToLower()))
-                .OrderByDescending(f => File.GetCreationTime(f))
-                .ToArray();
-
-            foreach (var file in files)
+            try
             {
-                var fileInfo = new FileInfo(file);
-                var item = new ScreenshotItem
+                _dispatcherQueue.TryEnqueue(() => Screenshots.Clear());
+
+                if (!Directory.Exists(_snippetsFolder))
+                    return;
+
+                var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".gif", ".bmp" };
+                var files = Directory.GetFiles(_snippetsFolder)
+                    .Where(f => imageExtensions.Contains(Path.GetExtension(f).ToLower()))
+                    .OrderByDescending(f => File.GetCreationTime(f))
+                    .ToArray();
+
+                foreach (var file in files)
                 {
-                    FilePath = file,
-                    FileName = Path.GetFileNameWithoutExtension(file),
-                    CreatedDate = fileInfo.CreationTime,
-                    ThumbnailPath = file
-                };
+                    var fileInfo = new FileInfo(file);
+                    var item = new ScreenshotItem
+                    {
+                        FilePath = file,
+                        FileName = Path.GetFileNameWithoutExtension(file),
+                        CreatedDate = fileInfo.CreationTime,
+                        ThumbnailPath = file
+                    };
 
-                item.PropertyChanged += OnScreenshotItemPropertyChanged;
-                Screenshots.Add(item);
+                    item.PropertyChanged += OnScreenshotItemPropertyChanged;
+
+                    _dispatcherQueue.TryEnqueue(() => Screenshots.Add(item));
+                }
+
+                _logger.LogInfo($"📷 Loaded {Screenshots.Count} screenshots from {_snippetsFolder}");
+
+                // Log each loaded screenshot for debugging
+                foreach (var screenshot in Screenshots)
+                {
+                    _logger.LogInfo($"📷 Screenshot: {screenshot.FileName} (IsEditing: {screenshot.IsEditing})");
+                }
             }
-
-            _logger.LogInfo($"Loaded {Screenshots.Count} screenshots from {_snippetsFolder}");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error loading screenshots: {ex.Message}", ex);
-        }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error loading screenshots: {ex.Message}", ex);
+            }
+        });
     }
 
     public async Task<bool> DeleteSelectedItemsAsync()
@@ -135,22 +150,40 @@ public class LibraryPageViewModel : INotifyPropertyChanged
 
     public void StartEditingItem(ScreenshotItem item)
     {
+        _logger.LogInfo($"📝 StartEditingItem called for: {item.FileName}");
+        _logger.LogInfo($"📝 Before: IsEditing = {item.IsEditing}");
         item.IsEditing = true;
+        _logger.LogInfo($"📝 After: IsEditing = {item.IsEditing}");
         _logger.LogInfo($"📝 Started editing filename for: {item.FileName}");
     }
 
     public async Task SaveItemNameAsync(ScreenshotItem item, string newName)
     {
+        _logger.LogInfo($"💾 SaveItemNameAsync: Attempting to rename '{item.FileName}' to '{newName}'");
+        _logger.LogInfo($"💾 Current file path: {item.FilePath}");
+        _logger.LogInfo($"💾 File exists before rename: {File.Exists(item.FilePath)}");
+
         var result = await _fileEditor.RenameSnippetAsync(item.FilePath, item.FileName, newName);
+
+        _logger.LogInfo($"💾 Rename result: Success={result.Success}, NewFileName={result.NewFileName}, ErrorMessage={result.ErrorMessage}");
 
         if (result.Success && result.NewFilePath != null && result.NewFileName != null)
         {
+            _logger.LogInfo($"💾 New file path: {result.NewFilePath}");
+            _logger.LogInfo($"💾 New file exists: {File.Exists(result.NewFilePath)}");
+            _logger.LogInfo($"💾 Old file still exists: {File.Exists(item.FilePath)}");
+
             item.FilePath = result.NewFilePath;
             item.FileName = result.NewFileName;
             item.ThumbnailPath = result.NewFilePath;
         }
+        else
+        {
+            _logger.LogInfo($"💾 Rename failed, keeping original name: {item.FileName}");
+        }
 
         item.IsEditing = false;
+        _logger.LogInfo($"💾 Final item state: FileName={item.FileName}, IsEditing={item.IsEditing}");
     }
 
     public void CancelEditingItem(ScreenshotItem item)
@@ -184,6 +217,19 @@ public class LibraryPageViewModel : INotifyPropertyChanged
         {
             OnPropertyChanged(nameof(HasSelectedItems));
         }
+    }
+
+    private string GetDocumentsPath()
+    {
+        // Try OneDrive Documents first
+        var oneDriveDocuments = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "OneDrive", "Documents");
+        if (Directory.Exists(oneDriveDocuments))
+        {
+            return oneDriveDocuments;
+        }
+
+        // Fallback to regular Documents folder
+        return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
     }
 
     private void OnPropertyChanged(string propertyName)

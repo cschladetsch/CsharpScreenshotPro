@@ -28,28 +28,26 @@ public class ScreenshotCaptureOrchestrator
         _logger.LogInfo($"Pre-allocated desktop bitmap: {screenWidth}x{screenHeight}");
     }
 
-    public async Task StartSnippingModeAsync()
+    public async Task<Bitmap> PrepareDesktopBitmapAsync()
     {
-        _logger.LogInfo("🎯 Starting snipping mode with correct sequence");
+        _logger.LogInfo("🎯 Preparing desktop bitmap for selection");
 
         // Small delay to ensure window has been moved off-screen by caller
         await Task.Delay(10);
         _logger.LogInfo("✅ Window should be off-screen");
 
-        // Step 2: Capture clean desktop into pre-allocated bitmap
+        // Step 1: Capture clean desktop into pre-allocated bitmap
         var screenRegion = new ScreenshotPro.Core.Models.Region(0, 0, _desktopBitmap.Width, _desktopBitmap.Height);
         await _captureService.CaptureRegionIntoBitmapAsync(screenRegion, _desktopBitmap);
 
-        // Step 3: Darken the desktop bitmap slightly
+        // Step 2: Darken the desktop bitmap slightly
         DarkenBitmap(_desktopBitmap, 0.7f);
         _logger.LogInfo("🌑 Desktop bitmap darkened");
 
-        // Step 4: Enter selection mode with darkened desktop
-        _logger.LogInfo("🎯 Entering selection mode");
-        await ShowRegionSelectionOverlay(_desktopBitmap);
+        return _desktopBitmap;
     }
 
-    public async Task StartInstantCaptureAsync()
+    public async Task<Bitmap?> StartInstantCaptureAsync()
     {
         _logger.LogInfo("⚡ StartInstantCaptureAsync called");
         _logger.LogInfo($"⏰ Instant capture timestamp: {DateTime.Now:HH:mm:ss.fff}");
@@ -67,17 +65,16 @@ public class ScreenshotCaptureOrchestrator
         var desktopBitmap = await captureService.CaptureRegionBitmapAsync(region);
         _logger.LogInfo($"📷 Desktop capture result: {(desktopBitmap != null ? "SUCCESS" : "FAILED")}");
 
-        // Show RegionSelectionWindow immediately
+        // Return the bitmap for UI layer to handle
         if (desktopBitmap != null)
         {
-            _logger.LogInfo("🏗️ Showing RegionSelectionWindow immediately");
-            await ShowRegionSelectionOverlay(desktopBitmap);
-            _logger.LogInfo("✅ RegionSelectionWindow shown");
+            _logger.LogInfo("✅ Desktop bitmap captured successfully");
+            return desktopBitmap;
         }
         else
         {
             _logger.LogError("❌ Failed to capture desktop, cannot show region selection");
-            // UI layer will handle the error
+            return null;
         }
     }
 
@@ -111,24 +108,6 @@ public class ScreenshotCaptureOrchestrator
         graphics.FillRectangle(darkBrush, 0, 0, bitmap.Width, bitmap.Height);
     }
 
-    private async Task ShowRegionSelectionOverlay(Bitmap desktopBitmap)
-    {
-        try
-        {
-            _logger.LogInfo("🏗️ Creating RegionSelectionWindow with darkened desktop");
-
-            // Note: This would need to be refactored to use dependency injection
-            // or event-based communication to avoid direct UI dependencies
-            // For now, we'll raise events that the UI can handle
-
-            _logger.LogInfo("✅ RegionSelectionWindow ready for display");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("❌ Error in ShowRegionSelectionOverlay", ex);
-            // UI layer will handle the error
-        }
-    }
 
     public void Dispose()
     {

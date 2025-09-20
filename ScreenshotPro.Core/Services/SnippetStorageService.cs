@@ -10,8 +10,21 @@ public class SnippetStorageService
 
     public SnippetStorageService()
     {
-        _snippetsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Snippets");
+        _snippetsFolder = Path.Combine(GetDocumentsPath(), "Snippets");
         EnsureSnippetsFolder();
+    }
+
+    private string GetDocumentsPath()
+    {
+        // Try OneDrive Documents first
+        var oneDriveDocuments = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "OneDrive", "Documents");
+        if (Directory.Exists(oneDriveDocuments))
+        {
+            return oneDriveDocuments;
+        }
+
+        // Fallback to regular Documents folder
+        return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
     }
 
     private void EnsureSnippetsFolder()
@@ -89,8 +102,14 @@ public class SnippetStorageService
     {
         try
         {
+            var logger = LoggingService.Instance;
+            logger.LogInfo($"🔄 RenameSnippetAsync: oldFilePath={oldFilePath}, newName={newName}");
+
             if (!File.Exists(oldFilePath))
+            {
+                logger.LogInfo($"❌ Source file does not exist: {oldFilePath}");
                 return false;
+            }
 
             var directory = Path.GetDirectoryName(oldFilePath);
             var extension = Path.GetExtension(oldFilePath);
@@ -102,20 +121,29 @@ public class SnippetStorageService
             }
 
             var newFilePath = Path.Combine(directory!, newName);
+            logger.LogInfo($"🔄 Target file path: {newFilePath}");
 
             // Check if target file already exists
             if (File.Exists(newFilePath))
+            {
+                logger.LogInfo($"❌ Target file already exists: {newFilePath}");
                 return false;
+            }
 
             await Task.Run(() =>
             {
+                logger.LogInfo($"🔄 Attempting File.Move from '{oldFilePath}' to '{newFilePath}'");
                 File.Move(oldFilePath, newFilePath);
+                logger.LogInfo($"✅ File.Move successful");
             });
 
+            logger.LogInfo($"✅ File renamed successfully to: {newFilePath}");
             return true;
         }
         catch (Exception ex)
         {
+            var logger = LoggingService.Instance;
+            logger.LogError($"❌ Failed to rename snippet: {ex.Message}", ex);
             throw new InvalidOperationException($"Failed to rename snippet: {ex.Message}", ex);
         }
     }

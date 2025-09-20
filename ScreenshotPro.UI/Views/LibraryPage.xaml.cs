@@ -9,6 +9,8 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Shapes;
 using ScreenshotPro.UI.ViewModels;
 using System.Runtime.InteropServices;
+using System.Drawing;
+using ScreenshotProRegion = ScreenshotPro.Core.Models.Region;
 
 namespace ScreenshotPro.UI.Views
 {
@@ -17,6 +19,7 @@ namespace ScreenshotPro.UI.Views
         private readonly ScreenshotCaptureOrchestrator _captureOrchestrator;
         private readonly LibraryPageViewModel _viewModel;
         private readonly LoggingService _logger;
+        private Windows.Graphics.PointInt32 _originalWindowPosition;
 
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(int nIndex);
@@ -64,21 +67,83 @@ namespace ScreenshotPro.UI.Views
 
             try
             {
-                // Move window off-screen before starting capture
+                // Store original position and move window off-screen before starting capture
                 var mainWindow = App.MainWindow;
                 if (mainWindow != null)
                 {
                     var appWindow = mainWindow.AppWindow;
+                    _originalWindowPosition = appWindow.Position;
                     appWindow.Move(new Windows.Graphics.PointInt32(-5000, -5000));
                 }
 
-                await _captureOrchestrator.StartSnippingModeAsync();
+                // Prepare the desktop bitmap
+                var desktopBitmap = await _captureOrchestrator.PrepareDesktopBitmapAsync();
+
+                // Create and show the region selection window
+                await ShowRegionSelectionWindow(desktopBitmap);
             }
             catch (Exception ex)
             {
                 _logger.LogError("❌ Capture failed", ex);
                 RestoreMainWindow();
                 await ShowErrorDialog("Capture Failed", $"An error occurred while capturing: {ex.Message}");
+            }
+        }
+
+        private Task ShowRegionSelectionWindow(Bitmap desktopBitmap)
+        {
+            try
+            {
+                _logger.LogInfo("🏗️ Creating RegionSelectionWindow with darkened desktop");
+                var regionWindow = new RegionSelectionWindow(desktopBitmap);
+
+                // Set up event handlers
+                regionWindow.RegionSelected += async (sender, e) =>
+                {
+                    _logger.LogInfo("🎯 RegionSelected event received");
+                    regionWindow.Close();
+                    await ProcessSelectedRegion((ScreenshotProRegion)e.SelectedRegion);
+                };
+
+                regionWindow.SelectionCancelled += (sender, e) =>
+                {
+                    _logger.LogInfo("❌ SelectionCancelled event received");
+                    regionWindow.Close();
+                    RestoreMainWindow();
+                };
+
+                // Show the region selection window
+                _logger.LogInfo("🚀 Activating RegionSelectionWindow");
+                regionWindow.Activate();
+                _logger.LogInfo("✅ RegionSelectionWindow activated");
+                return Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("❌ Error in ShowRegionSelectionWindow", ex);
+                RestoreMainWindow();
+                return Task.CompletedTask;
+            }
+        }
+
+        private async Task ProcessSelectedRegion(ScreenshotProRegion region)
+        {
+            try
+            {
+                var bitmap = await _captureOrchestrator.ProcessSelectedRegionAsync(region);
+                if (bitmap != null)
+                {
+                    await _viewModel.SaveSnippetAsync(bitmap);
+                    bitmap.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("❌ Failed to process selected region", ex);
+            }
+            finally
+            {
+                RestoreMainWindow();
             }
         }
 
@@ -104,9 +169,27 @@ namespace ScreenshotPro.UI.Views
 
         private void FileName_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            if (sender is TextBlock textBlock && textBlock.Tag is ScreenshotItem item)
+            _logger.LogInfo("🖱️ FileName_Tapped event fired!");
+
+            if (sender is TextBlock textBlock)
             {
-                _viewModel.StartEditingItem(item);
+                _logger.LogInfo($"🖱️ Sender is TextBlock with text: '{textBlock.Text}'");
+
+                if (textBlock.Tag is ScreenshotItem item)
+                {
+                    _logger.LogInfo($"🖱️ Tag is ScreenshotItem: {item.FileName}, IsEditing: {item.IsEditing}");
+                    _logger.LogInfo("🖱️ Calling _viewModel.StartEditingItem...");
+                    _viewModel.StartEditingItem(item);
+                    _logger.LogInfo($"🖱️ After StartEditingItem, IsEditing: {item.IsEditing}");
+                }
+                else
+                {
+                    _logger.LogError($"🖱️ Tag is not ScreenshotItem, it's: {textBlock.Tag?.GetType()}", null);
+                }
+            }
+            else
+            {
+                _logger.LogError($"🖱️ Sender is not TextBlock, it's: {sender?.GetType()}", null);
             }
         }
 
@@ -117,11 +200,15 @@ namespace ScreenshotPro.UI.Views
                 if (e.Key == Windows.System.VirtualKey.Enter)
                 {
                     await _viewModel.SaveItemNameAsync(item, textBox.Text);
+                    // Remove focus to prevent LostFocus from firing
+                    this.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
                     e.Handled = true;
                 }
                 else if (e.Key == Windows.System.VirtualKey.Escape)
                 {
                     _viewModel.CancelEditingItem(item);
+                    // Remove focus to prevent LostFocus from firing
+                    this.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
                     e.Handled = true;
                 }
             }
@@ -131,7 +218,11 @@ namespace ScreenshotPro.UI.Views
         {
             if (sender is TextBox textBox && textBox.Tag is ScreenshotItem item)
             {
-                await _viewModel.SaveItemNameAsync(item, textBox.Text);
+                // Only save if we're still in editing mode (Enter/Escape would have set IsEditing to false)
+                if (item.IsEditing)
+                {
+                    await _viewModel.SaveItemNameAsync(item, textBox.Text);
+                }
             }
         }
 
@@ -161,21 +252,9 @@ namespace ScreenshotPro.UI.Views
                 var mainWindow = App.MainWindow;
                 if (mainWindow != null)
                 {
-                    // Move window back to center of screen first (using virtual desktop dimensions)
-                    var screenWidth = GetSystemMetrics(78); // SM_CXVIRTUALSCREEN - Width of virtual desktop
-                    var screenHeight = GetSystemMetrics(79); // SM_CYVIRTUALSCREEN - Height of virtual desktop
-
-                    // Get actual window size
-                    var windowWidth = mainWindow.AppWindow.Size.Width;
-                    var windowHeight = mainWindow.AppWindow.Size.Height;
-
-                    var centerX = (screenWidth - windowWidth) / 2;
-                    var centerY = (screenHeight - windowHeight) / 2;
-                    mainWindow.AppWindow.Move(new Windows.Graphics.PointInt32(centerX, centerY));
-                    _logger.LogInfo($"🔧 Window moved back to center: ({centerX}, {centerY})");
-
-                    // Restore window visibility - AppWindow.Show() handles this
-                    _logger.LogInfo("🔧 Preparing to show window");
+                    // Restore window to original position
+                    mainWindow.AppWindow.Move(_originalWindowPosition);
+                    _logger.LogInfo($"🔧 Window restored to original position: ({_originalWindowPosition.X}, {_originalWindowPosition.Y})");
 
                     // Show and activate the window
                     mainWindow.AppWindow.Show();
@@ -197,9 +276,21 @@ namespace ScreenshotPro.UI.Views
     {
         private bool _isSelected;
         private bool _isEditing;
+        private string _fileName = string.Empty;
 
         public string FilePath { get; set; } = string.Empty;
-        public string FileName { get; set; } = string.Empty;
+        public string FileName
+        {
+            get => _fileName;
+            set
+            {
+                if (_fileName != value)
+                {
+                    _fileName = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FileName)));
+                }
+            }
+        }
         public DateTime CreatedDate { get; set; }
         public string ThumbnailPath { get; set; } = string.Empty;
 
