@@ -8,9 +8,21 @@
         <!-- Desktop screenshot background -->
         <Image Name="DesktopImage" Stretch="Fill"/>
 
-        <!-- Dimming overlay -->
-        <Grid Name="OverlayGrid" Background="#40000000">
-            <!-- Selection canvas -->
+        <!-- Overlay container -->
+        <Grid Name="OverlayGrid">
+            <!-- Canvas for dimming rectangles around selection -->
+            <Canvas Name="DimmingCanvas">
+                <!-- Top dimming rectangle -->
+                <Rectangle Name="TopDimmingRect" Fill="#40000000"/>
+                <!-- Bottom dimming rectangle -->
+                <Rectangle Name="BottomDimmingRect" Fill="#40000000"/>
+                <!-- Left dimming rectangle -->
+                <Rectangle Name="LeftDimmingRect" Fill="#40000000"/>
+                <!-- Right dimming rectangle -->
+                <Rectangle Name="RightDimmingRect" Fill="#40000000"/>
+            </Canvas>
+
+            <!-- Selection border -->
             <Canvas Name="SelectionCanvas">
                 <Rectangle Name="SelectionRectangle"
                            Stroke="#FF0078D4"
@@ -18,7 +30,6 @@
                            Fill="Transparent"
                            Visibility="Collapsed"/>
             </Canvas>
-
         </Grid>
     </Grid>
 </Window>
