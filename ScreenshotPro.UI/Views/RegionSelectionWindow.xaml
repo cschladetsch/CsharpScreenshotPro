@@ -9,26 +9,27 @@
         <Image Name="DesktopImage" Stretch="Fill"/>
 
         <!-- Overlay container -->
-        <Grid Name="OverlayGrid">
-            <!-- Canvas for dimming rectangles around selection -->
-            <Canvas Name="DimmingCanvas">
+        <Grid Name="OverlayGrid" Background="Transparent">
+            <!-- Four dimming rectangles to create clear hole -->
+            <Canvas Name="DimmingCanvas" Background="Transparent">
                 <!-- Top dimming rectangle -->
-                <Rectangle Name="TopDimmingRect" Fill="#40000000"/>
+                <Rectangle Name="TopDimmingRect" Fill="#40000000" Canvas.ZIndex="1"/>
                 <!-- Bottom dimming rectangle -->
-                <Rectangle Name="BottomDimmingRect" Fill="#40000000"/>
+                <Rectangle Name="BottomDimmingRect" Fill="#40000000" Canvas.ZIndex="1"/>
                 <!-- Left dimming rectangle -->
-                <Rectangle Name="LeftDimmingRect" Fill="#40000000"/>
+                <Rectangle Name="LeftDimmingRect" Fill="#40000000" Canvas.ZIndex="1"/>
                 <!-- Right dimming rectangle -->
-                <Rectangle Name="RightDimmingRect" Fill="#40000000"/>
+                <Rectangle Name="RightDimmingRect" Fill="#40000000" Canvas.ZIndex="1"/>
             </Canvas>
 
-            <!-- Selection border -->
-            <Canvas Name="SelectionCanvas">
+            <!-- Selection border (above dimming) -->
+            <Canvas Name="SelectionCanvas" Background="Transparent">
                 <Rectangle Name="SelectionRectangle"
                            Stroke="#FF0078D4"
                            StrokeThickness="2"
                            Fill="Transparent"
-                           Visibility="Collapsed"/>
+                           Visibility="Collapsed"
+                           Canvas.ZIndex="2"/>
             </Canvas>
         </Grid>
     </Grid>

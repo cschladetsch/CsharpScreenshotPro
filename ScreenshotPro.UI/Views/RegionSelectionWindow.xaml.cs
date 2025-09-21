@@ -71,7 +71,7 @@ namespace ScreenshotPro.UI.Views
             var canvasWidth = OverlayGrid.ActualWidth;
             var canvasHeight = OverlayGrid.ActualHeight;
 
-            // Initially dim the entire screen
+            // Initially dim the entire screen with top rectangle
             Canvas.SetLeft(TopDimmingRect, 0);
             Canvas.SetTop(TopDimmingRect, 0);
             TopDimmingRect.Width = canvasWidth;
@@ -294,39 +294,44 @@ namespace ScreenshotPro.UI.Views
             var width = Math.Abs(_currentPoint.X - _startPoint.X);
             var height = Math.Abs(_currentPoint.Y - _startPoint.Y);
 
-            // Update selection rectangle
+            // Update selection rectangle border
             Canvas.SetLeft(SelectionRectangle, left);
             Canvas.SetTop(SelectionRectangle, top);
             SelectionRectangle.Width = width;
             SelectionRectangle.Height = height;
 
-            // Update dimming rectangles to create a "hole" for the selection
+            // Get canvas dimensions
             var canvasWidth = OverlayGrid.ActualWidth;
             var canvasHeight = OverlayGrid.ActualHeight;
 
-            // Top rectangle (covers from top of screen to top of selection)
+            // Ensure we have valid dimensions
+            if (canvasWidth <= 0 || canvasHeight <= 0) return;
+
+            // Top rectangle - from top of screen to top of selection
             Canvas.SetLeft(TopDimmingRect, 0);
             Canvas.SetTop(TopDimmingRect, 0);
             TopDimmingRect.Width = canvasWidth;
             TopDimmingRect.Height = Math.Max(0, top);
 
-            // Bottom rectangle (covers from bottom of selection to bottom of screen)
+            // Bottom rectangle - from bottom of selection to bottom of screen
+            var bottomTop = top + height;
             Canvas.SetLeft(BottomDimmingRect, 0);
-            Canvas.SetTop(BottomDimmingRect, top + height);
+            Canvas.SetTop(BottomDimmingRect, bottomTop);
             BottomDimmingRect.Width = canvasWidth;
-            BottomDimmingRect.Height = Math.Max(0, canvasHeight - (top + height));
+            BottomDimmingRect.Height = Math.Max(0, canvasHeight - bottomTop);
 
-            // Left rectangle (covers from left of screen to left of selection, between top and bottom rects)
+            // Left rectangle - from left edge to left of selection (only in selection row)
             Canvas.SetLeft(LeftDimmingRect, 0);
             Canvas.SetTop(LeftDimmingRect, top);
             LeftDimmingRect.Width = Math.Max(0, left);
-            LeftDimmingRect.Height = height;
+            LeftDimmingRect.Height = Math.Max(0, height);
 
-            // Right rectangle (covers from right of selection to right of screen, between top and bottom rects)
-            Canvas.SetLeft(RightDimmingRect, left + width);
+            // Right rectangle - from right of selection to right edge (only in selection row)
+            var rightLeft = left + width;
+            Canvas.SetLeft(RightDimmingRect, rightLeft);
             Canvas.SetTop(RightDimmingRect, top);
-            RightDimmingRect.Width = Math.Max(0, canvasWidth - (left + width));
-            RightDimmingRect.Height = height;
+            RightDimmingRect.Width = Math.Max(0, canvasWidth - rightLeft);
+            RightDimmingRect.Height = Math.Max(0, height);
         }
 
         private void CompleteSelection()
