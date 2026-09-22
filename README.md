@@ -1,5 +1,8 @@
 # ScreenshotPro - Advanced Screenshot Annotation Tool
 
+📖 [Docs & diagrams](https://cschladetsch.github.io/CsharpScreenshotPro/)
+
+
 ScreenshotPro is a professional screenshot annotation application built with .NET 8, and WinUI3. It provides advanced annotation capabilities with a focus on productivity and user experience.
 
 ## Demo
